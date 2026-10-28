@@ -1,0 +1,14 @@
+﻿{
+  "WoodenBox": {
+    "label": "Item_WoodenBox",
+    "prompt": "조사한다",
+    "dialogue": "WoodenBox",
+    "size": 150,
+    "area": "Alley",
+    "location": {
+      "x": 0,
+      "y": 0,
+      "z": 75
+    }
+  }
+}

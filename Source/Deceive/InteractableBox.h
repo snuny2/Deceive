@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "DeceiveDialogueTypes.h"
+#include "DeceiveItemTypes.h"
 #include "Interactable.h"
 #include "InteractableBox.generated.h"
 
@@ -22,6 +23,9 @@ public:
 	virtual void OnConstruction(const FTransform& Transform) override;
 
 	virtual void Interact_Implementation(AActor* InteractingActor) override;
+
+	/** Fills this object in from the data tables. Call before FinishSpawning. */
+	void ApplyItemData(const FItemData& Item, const FDialogueData& InDialogue);
 	virtual FText GetInteractPrompt_Implementation() const override { return InteractPrompt; }
 
 	/** Wording on the prompt while this is in range. */

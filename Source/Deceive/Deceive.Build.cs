@@ -12,7 +12,9 @@ public class Deceive : ModuleRules
 			"CoreUObject",
 			"Engine",
 			"InputCore",
-			"EnhancedInput"
+			"EnhancedInput",
+			"Json",
+			"JsonUtilities"
 		});
 	}
 }

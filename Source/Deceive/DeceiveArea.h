@@ -6,6 +6,7 @@
 #include "DeceiveArea.generated.h"
 
 class AAreaTransition;
+class AInteractableBox;
 class UStaticMeshComponent;
 class UMaterialInterface;
 class UTexture2D;
@@ -49,6 +50,14 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Area", meta = (ClampMin = "5"))
 	float FloorThickness = 20.f;
 
+	/** Which entry of EDeceiveArea this is; decides which items belong here. */
+	UPROPERTY(EditAnywhere, Category = "Area")
+	EDeceiveArea AreaId = EDeceiveArea::Alley;
+
+	/** Actor class the item table is spawned as. */
+	UPROPERTY(EditAnywhere, Category = "Area")
+	TSubclassOf<AInteractableBox> ItemClass;
+
 protected:
 	/** Call from the constructor; box meshes cannot be created any later. */
 	void CreateBoxes(int32 Count);
@@ -61,8 +70,11 @@ protected:
 	 */
 	void LayOutBlocker(int32 Index, const FVector& Center, const FVector& Size);
 
-	/** Spawns whatever lives inside this area. Called once, on BeginPlay. */
-	virtual void SpawnContents() {}
+	/**
+	 * Spawns whatever lives inside this area. Called once, on BeginPlay. The base
+	 * version spawns this area's entries from Items.json; overrides should call it.
+	 */
+	virtual void SpawnContents();
 
 	AAreaTransition* SpawnTransition(const FVector& Location, const FVector& Extent, EDeceiveArea TargetArea, FName TargetEntry);
 

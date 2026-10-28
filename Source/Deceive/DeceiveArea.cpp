@@ -3,8 +3,11 @@
 #include "AreaTransition.h"
 #include "Components/StaticMeshComponent.h"
 #include "DeceiveLog.h"
+#include "DeceiveDataSubsystem.h"
 #include "DeceiveSpriteMaterial.h"
+#include "Engine/GameInstance.h"
 #include "Engine/StaticMesh.h"
+#include "InteractableBox.h"
 #include "UObject/ConstructorHelpers.h"
 
 namespace
@@ -16,6 +19,52 @@ ADeceiveArea::ADeceiveArea()
 {
 	PrimaryActorTick.bCanEverTick = false;
 	SetRootComponent(CreateDefaultSubobject<USceneComponent>(TEXT("Root")));
+	ItemClass = AInteractableBox::StaticClass();
+}
+
+void ADeceiveArea::SpawnContents()
+{
+	UWorld* World = GetWorld();
+	const UGameInstance* GameInstance = GetGameInstance();
+	const UDeceiveDataSubsystem* Data = GameInstance ? GameInstance->GetSubsystem<UDeceiveDataSubsystem>() : nullptr;
+
+	if (!World || !Data || !ItemClass)
+	{
+		return;
+	}
+
+	TArray<FItemData> AreaItems;
+	Data->GetItemsInArea(AreaId, AreaItems);
+
+	for (const FItemData& Item : AreaItems)
+	{
+		FDialogueData Dialogue;
+		if (!Item.DialogueId.IsNone() && !Data->FindDialogue(Item.DialogueId, Dialogue))
+		{
+			UE_LOG(LogDeceive, Warning, TEXT("Item '%s' wants dialogue '%s', which Dialogues.json does not have."),
+				*Item.ItemId.ToString(), *Item.DialogueId.ToString());
+		}
+
+		const FTransform SpawnTransform(Item.Location);
+		AInteractableBox* Spawned = World->SpawnActorDeferred<AInteractableBox>(ItemClass, SpawnTransform);
+		if (!Spawned)
+		{
+			continue;
+		}
+
+		Spawned->ApplyItemData(Item, Dialogue);
+		Spawned->FinishSpawning(SpawnTransform);
+
+#if WITH_EDITOR
+		if (!Item.Label.IsEmpty())
+		{
+			Spawned->SetActorLabel(Item.Label);
+		}
+#endif
+
+		SpawnedContents.Add(Spawned);
+		UE_LOG(LogDeceive, Log, TEXT("Item spawned: %s at %s"), *Item.ItemId.ToString(), *Item.Location.ToString());
+	}
 }
 
 void ADeceiveArea::CreateBoxes(int32 Count)

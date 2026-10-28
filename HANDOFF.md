@@ -15,9 +15,9 @@ HD-2D 스토리텔링 게임. 주인공 3명, 각각의 스토리.
 | --- | --- |
 | 엔진 | **UE 5.7** |
 | 프로젝트 | `C:\Users\efzxc\Desktop\Deceive` |
-| 모듈 | `Deceive` — C++ 소스 25개 파일, 약 2,300줄 |
+| 모듈 | `Deceive` — C++ 소스 28개 파일, 약 2,670줄 |
 | 플러그인 | Paper2D (머티리얼 애셋만 사용), EnhancedInput |
-| 콘텐츠 애셋 | **0개** |
+| 콘텐츠 애셋 | **0개** (데이터는 `Content/Data/*.json`) |
 
 > 처음엔 UE 5.6으로 요청받았으나 설치된 엔진이 5.7뿐이라 5.7로 맞췄습니다.
 
@@ -37,6 +37,7 @@ Claude Code는 텍스트 파일만 만들 수 있어서 **언리얼 바이너리
 | 커스텀 머티리얼 | Paper2D 내장 머티리얼 + `UMaterialInstanceDynamic` |
 | `InputAction` / `InputMappingContext` | `NewObject` 로 런타임 생성 |
 | UMG 대사창·프롬프트 | `AHUD::DrawHUD()` 에서 캔버스에 직접 그림 |
+| DataTable 애셋 | `Content/Data/*.json` 을 직접 파싱 |
 
 **결과: 빈 레벨 하나만 있으면 플레이됩니다.** 레벨에 아무것도 배치할 필요가 없습니다.
 
@@ -61,16 +62,15 @@ Claude Code는 텍스트 파일만 만들 수 있어서 **언리얼 바이너리
 
 출입구 2개는 둘 다 -Y 팔(화면 왼쪽 골목)에 있습니다.
 
-**겹친다고 이동하지 않습니다.** 포탈은 상호작용 대상(`IInteractable`)이고, F 로 질문에
-답해야 넘어갑니다. **첫 번째 선택지가 항상 이동**입니다.
+**겹친다고 이동하지 않습니다.** 포탈은 상호작용 대상(`IInteractable`)이고, 범위 안에서
+**F 를 누르면 바로 이동**합니다. 프롬프트가 이미 "이동한다"라고 말하므로 같은 것을
+다시 묻는 질문 단계는 두지 않았습니다.
 
-| 포탈 | 위치 | 질문 / 선택지 |
-| --- | --- | --- |
-| `Portal_ToBuilding` | -Y 팔의 +X 쪽 벽 구멍 (Y = -700) | 건물에 들어갈까? / 들어간다 · 안 들어간다 |
-| `Portal_ToNextStreet` | -Y 팔 끝벽에 밀착 | 다음 장소로 이동할까? / 이동한다 · 남아있는다 |
-| `Portal_ToAlley` | 방의 출입구 | 밖으로 나갈까? / 나간다 · 남아있는다 |
-
-문구는 `AAreaTransition::Dialogue` 에 있고, 비면 목적지에 맞춰 자동으로 채워집니다.
+| 포탈 | 위치 |
+| --- | --- |
+| `Portal_ToBuilding` | -Y 팔의 +X 쪽 벽 구멍 (Y = -700) |
+| `Portal_ToNextStreet` | -Y 팔 끝벽에 밀착 |
+| `Portal_ToAlley` | 방의 출입구 |
 
 **세 가지 주의할 점:**
 
@@ -116,22 +116,48 @@ Claude Code는 텍스트 파일만 만들 수 있어서 **언리얼 바이너리
 뜹니다. 문구는 **대상이 정합니다** (`GetInteractPrompt()`):
 오브젝트는 "조사한다", 포탈은 "이동한다".
 
+### 데이터 파일 (`Content/Data`)
+
+대사와 아이템은 JSON 에서 읽습니다. **고쳐도 빌드가 필요 없습니다.**
+
+| 파일 | 내용 |
+| --- | --- |
+| `Dialogues.json` | 이름 → `FDialogueData` |
+| `Items.json` | 이름 → `FItemData` (라벨, 프롬프트, 대사 id, 크기, 영역, 좌표) |
+
+`UDeceiveDataSubsystem`(GameInstance 서브시스템) 이 인스턴스 생성 시 한 번 읽고,
+콘솔 `ReloadData` 로 다시 읽습니다. 아이템은 자기 `area` 가 생길 때
+`ADeceiveArea::SpawnContents` 가 스폰하므로, 영역마다 코드를 고칠 필요가 없습니다.
+
+**두 파일 모두 UTF-8 BOM 필수.** BOM 이 없으면 `FFileHelper::LoadFileToString` 이
+한글을 깨뜨립니다.
+
+포탈 대사만 예외로 코드에 있습니다 — 목적지에서 문구가 자동으로 나오기 때문입니다.
+
 ### 대사
 
 `FDialogueData` 한 덩어리입니다: `Speaker`, `ChoiceId`, `Lines`, `Question`,
 `ChoiceA`, `ChoiceB`. 진행은 **도입 → 질문/선택지 → 선택별 결과 → 닫힘**.
 `Question` 을 비우면 선택 단계 없이 끝납니다. 대사 중에는 이동이 막힙니다.
 
-답을 받아 행동해야 하는 쪽(포탈)을 위해
-`StartDialogueWithHandler(Data, TFunction<void(bool bChoseB)>)` 가 있습니다.
+선택의 결과로 **무언가를 실행할 방법은 아직 없습니다.** 포탈이 쓰던
+`StartDialogueWithHandler` 가 있었지만, 포탈이 질문을 안 하게 되면서 쓰는 곳이
+없어져 지웠습니다. 다시 필요해지면 되살리면 됩니다.
 
-### 선택 기록
+### 플래그와 선택 기록
 
-`UDeceiveGameInstance` 에 쌓입니다. 레벨 전환과 폰 교체를 넘어 살아남아야 해서
+`UDeceiveGameInstance` 에 있습니다. 레벨 전환과 폰 교체를 넘어 살아남아야 해서
 GameInstance 를 골랐습니다 — 주인공 3명 전환이 들어오면 필수가 됩니다.
 
-**`ChoiceId` 가 비어 있는 질문은 기록하지 않습니다.** 포탈 질문이 종료 요약에
-쌓이면 노이즈이기 때문입니다.
+**플래그가 기억의 본체입니다.** `TMap<FName, int32>` 로, 답변(0 = 첫 선택지), 주운
+물건, 열어 둔 문, 횟수 무엇이든 담습니다. API 는 `SetFlag` / `GetFlag` / `HasFlag` /
+`ClearFlag` / `GetFlags`. 선택을 기록하면 `ChoiceId` 가 그대로 플래그 이름이 되고,
+`TryGetChoice` 도 플래그를 읽습니다.
+
+`FChoiceRecord` 배열은 **종료 요약 화면용**입니다. 질문과 라벨 텍스트를 들고 있습니다.
+
+**`ChoiceId` 가 비어 있는 질문은 기록도 플래그도 남기지 않습니다.** 포탈 질문이
+종료 요약에 쌓이면 노이즈이기 때문입니다.
 
 `EndGame()` 이 불린 뒤에만 전체 화면 요약이 뜹니다. **게임 중에는 절대 안 뜹니다.**
 아직 엔딩이 없어 부르는 곳이 없으니, 테스트는 콘솔에 `EndGame`.
@@ -156,6 +182,10 @@ GameInstance 를 골랐습니다 — 주인공 3명 전환이 들어오면 필�
   `EndGame` → 요약 표시, 포탈 상호작용 → 선택 → `Travelled to ...`
 - 포탈 치수를 로그와 수식 계산으로 교차 확인 (구멍 vs 트리거 세 축 일치),
   투명벽 두 개의 위치·크기·`bHiddenInGame`
+- **JSON 전환 후 동작 동일성**: `Data loaded: 1 dialogue(s), 1 item(s).`,
+  `Item spawned: WoodenBox at X=0 Y=0 Z=75`(이전 하드코딩 위치와 같음),
+  화면의 화자·도입·질문·선택지·결과 문구가 전부 이전과 동일,
+  `Flag set: WoodenBox_Lid = 0` → `Choice recorded: WoodenBox_Lid = 열어본다`
 - **사용자 확인**: 벽에 막히는 것, 맵 밖으로 나갈 구멍이 더 없는 것,
   상호작용 거리가 적당한 것
 
@@ -163,6 +193,10 @@ GameInstance 를 골랐습니다 — 주인공 3명 전환이 들어오면 필�
 
 - 포탈에서 **"남아있는다" 를 골랐을 때 아무 일도 안 하는 것** — 코드로만 확인
   (한 줄 분기)
+- 플래그의 `GetFlag` / `HasFlag` / `ClearFlag` — `SetFlag` 만 로그로 확인했고,
+  나머지는 `TryGetChoice` 를 통해 간접적으로만 쓰임
+- **JSON 파일이 패키징된 빌드에 포함되는지** — `Content/Data` 는 쿡 대상이 아니라서
+  Project Settings 의 "Additional Non-Asset Directories to Package" 에 넣어야 함
 - 에디터 뷰포트에서의 `OnConstruction` 실시간 반영
 - 실제 텍스처를 넣었을 때의 모양 (플레이스홀더로만 확인)
 
@@ -220,7 +254,9 @@ GameInstance 를 골랐습니다 — 주인공 3명 전환이 들어오면 필�
 - 전환 연출 (페이드 등) — 지금은 한 프레임에 즉시 바뀜
 - 엔딩 자체 (`EndGame()` 을 부르는 곳)
 - 선택 기록의 디스크 저장 (`USaveGame`) — 지금은 프로세스가 끝나면 사라짐
-- 기록을 읽어 대사를 분기시키는 실제 사용처 (`TryGetChoice` 는 준비됨)
+- 플래그를 읽어 대사를 분기시키는 실제 사용처 (`GetFlag` / `TryGetChoice` 는 준비됨)
+- 선택의 결과로 플래그를 세우거나 무언가를 실행하는 수단 (대사는 텍스트만 출력)
+- `Dialogues.json` 에 조건부 줄 (플래그에 따라 다른 대사) 을 쓸 방법
 - 선택지 3개 이상 (지금은 A/B 2개 고정)
 - 대사창 크기가 내용에 따라 바뀌는 문제 (사용자가 나중으로 미뤄둠)
 - `NextStreet` 는 빈 방일 뿐 실제 거리가 아님

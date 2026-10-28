@@ -62,12 +62,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Dialogue")
 	void StartDialogue(const FDialogueData& InDialogue);
 
-	/**
-	 * Same, but for callers that have to act on the answer. The handler runs as
-	 * soon as the player answers, before any result lines have been read.
-	 */
-	void StartDialogueWithHandler(const FDialogueData& InDialogue, TFunction<void(bool bChoseB)> OnChoiceMade);
-
 	UFUNCTION(BlueprintPure, Category = "Dialogue")
 	bool IsDialogueActive() const { return bDialogueActive; }
 
@@ -121,9 +115,6 @@ private:
 	/** The run being read out: the opening lines first, then a choice's result. */
 	UPROPERTY(Transient)
 	TArray<FText> CurrentLines;
-
-	/** Set only by StartDialogueWithHandler; cleared when the box closes. */
-	TFunction<void(bool bChoseB)> ChoiceHandler;
 
 	int32 LineIndex = 0;
 	int32 SelectedChoiceIndex = 0;

@@ -74,6 +74,7 @@ ADeceiveArea* ADeceiveGameMode::SpawnArea(EDeceiveArea Area)
 		return nullptr;
 	}
 
+	Room->AreaId = Area;
 	Room->ReturnArea = EDeceiveArea::Alley;
 	Room->ReturnEntry = (Area == EDeceiveArea::Building) ? TEXT("FromBuilding") : TEXT("FromWest");
 

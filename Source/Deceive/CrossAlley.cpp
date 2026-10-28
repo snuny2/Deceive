@@ -1,7 +1,5 @@
 #include "CrossAlley.h"
 
-#include "InteractableBox.h"
-
 namespace
 {
 	/**
@@ -14,7 +12,7 @@ namespace
 ACrossAlley::ACrossAlley()
 {
 	CreateBoxes(NumAlleyBoxes);
-	TestBoxClass = AInteractableBox::StaticClass();
+	AreaId = EDeceiveArea::Alley;
 }
 
 void ACrossAlley::OnConstruction(const FTransform& Transform)
@@ -115,24 +113,6 @@ FVector ACrossAlley::GetEntryLocation(FName EntryName) const
 void ACrossAlley::SpawnContents()
 {
 	Super::SpawnContents();
-
-	UWorld* World = GetWorld();
-	if (!World)
-	{
-		return;
-	}
-
-	if (TestBoxClass)
-	{
-		// Sitting on the floor at the crossing.
-		if (AActor* TestBox = World->SpawnActor<AInteractableBox>(TestBoxClass, FTransform(FVector(0.f, 0.f, 75.f))))
-		{
-#if WITH_EDITOR
-			TestBox->SetActorLabel(TEXT("Item_WoodenBox"));
-#endif
-			SpawnedContents.Add(TestBox);
-		}
-	}
 
 	// Doorway into the building, on the far side of the -Y arm.
 	// Exactly the hole in the wall: the wall's thickness, the doorway's width and

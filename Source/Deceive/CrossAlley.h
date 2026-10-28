@@ -4,7 +4,6 @@
 #include "DeceiveArea.h"
 #include "CrossAlley.generated.h"
 
-class AInteractableBox;
 class UTexture2D;
 
 /** A cross-shaped alley built from box meshes, so no level asset is required. */
@@ -42,10 +41,6 @@ public:
 	/** Swap this to retexture the walls. */
 	UPROPERTY(EditAnywhere, Category = "Alley|Texture")
 	TObjectPtr<UTexture2D> WallTexture;
-
-	/** Test target dropped at the crossing. */
-	UPROPERTY(EditAnywhere, Category = "Alley")
-	TSubclassOf<AInteractableBox> TestBoxClass;
 
 protected:
 	virtual void SpawnContents() override;

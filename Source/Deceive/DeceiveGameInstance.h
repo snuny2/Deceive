@@ -29,6 +29,26 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Choices")
 	void ClearChoices();
 
+	// --- Flags -------------------------------------------------------------
+	// Anything the story needs to remember: answers, items picked up, doors
+	// opened, counters. A choice also writes its answer here (0 = first option).
+
+	UFUNCTION(BlueprintCallable, Category = "Flags")
+	void SetFlag(FName FlagName, int32 Value = 1);
+
+	/** DefaultValue is returned when the flag was never set. */
+	UFUNCTION(BlueprintPure, Category = "Flags")
+	int32 GetFlag(FName FlagName, int32 DefaultValue = 0) const;
+
+	UFUNCTION(BlueprintPure, Category = "Flags")
+	bool HasFlag(FName FlagName) const;
+
+	UFUNCTION(BlueprintCallable, Category = "Flags")
+	void ClearFlag(FName FlagName);
+
+	UFUNCTION(BlueprintPure, Category = "Flags")
+	const TMap<FName, int32>& GetFlags() const { return Flags; }
+
 	/**
 	 * Call this from whatever ends the game. Until it is called the summary stays
 	 * hidden. Also reachable from the console as `EndGame` for testing.
@@ -42,6 +62,9 @@ public:
 private:
 	UPROPERTY()
 	TArray<FChoiceRecord> ChoiceRecords;
+
+	UPROPERTY()
+	TMap<FName, int32> Flags;
 
 	bool bGameFinished = false;
 };

@@ -2,8 +2,38 @@
 
 #include "DeceiveLog.h"
 
+void UDeceiveGameInstance::SetFlag(FName FlagName, int32 Value)
+{
+	if (FlagName.IsNone())
+	{
+		return;
+	}
+
+	Flags.Add(FlagName, Value);
+	UE_LOG(LogDeceive, Log, TEXT("Flag set: %s = %d"), *FlagName.ToString(), Value);
+}
+
+int32 UDeceiveGameInstance::GetFlag(FName FlagName, int32 DefaultValue) const
+{
+	const int32* Found = Flags.Find(FlagName);
+	return Found ? *Found : DefaultValue;
+}
+
+bool UDeceiveGameInstance::HasFlag(FName FlagName) const
+{
+	return Flags.Contains(FlagName);
+}
+
+void UDeceiveGameInstance::ClearFlag(FName FlagName)
+{
+	Flags.Remove(FlagName);
+}
+
 void UDeceiveGameInstance::RecordChoice(const FChoiceRecord& Record)
 {
+	// The answer itself lives in the flags; the record is only for the summary.
+	SetFlag(Record.ChoiceId, Record.bChoseB ? 1 : 0);
+
 	if (!Record.ChoiceId.IsNone())
 	{
 		const int32 Existing = ChoiceRecords.IndexOfByPredicate(
@@ -24,21 +54,19 @@ void UDeceiveGameInstance::RecordChoice(const FChoiceRecord& Record)
 
 bool UDeceiveGameInstance::TryGetChoice(FName ChoiceId, bool& bOutChoseB) const
 {
-	const FChoiceRecord* Found = ChoiceRecords.FindByPredicate(
-		[ChoiceId](const FChoiceRecord& Candidate) { return Candidate.ChoiceId == ChoiceId; });
-
-	if (!Found)
+	if (!HasFlag(ChoiceId))
 	{
 		return false;
 	}
 
-	bOutChoseB = Found->bChoseB;
+	bOutChoseB = GetFlag(ChoiceId) != 0;
 	return true;
 }
 
 void UDeceiveGameInstance::ClearChoices()
 {
 	ChoiceRecords.Reset();
+	Flags.Reset();
 	bGameFinished = false;
 }
 

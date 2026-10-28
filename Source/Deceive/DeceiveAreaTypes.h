@@ -25,6 +25,16 @@ inline const TCHAR* DeceiveAreaName(EDeceiveArea Area)
 	return TEXT("Unknown");
 }
 
+/** Parses the name a data file uses. Returns false when it matches nothing. */
+inline bool DeceiveAreaFromName(const FString& Name, EDeceiveArea& OutArea)
+{
+	if (Name.Equals(TEXT("Alley"), ESearchCase::IgnoreCase))		{ OutArea = EDeceiveArea::Alley; return true; }
+	if (Name.Equals(TEXT("Building"), ESearchCase::IgnoreCase))		{ OutArea = EDeceiveArea::Building; return true; }
+	if (Name.Equals(TEXT("NextStreet"), ESearchCase::IgnoreCase))	{ OutArea = EDeceiveArea::NextStreet; return true; }
+
+	return false;
+}
+
 /** Colour a portal leading to this area is drawn in while debugging. */
 inline FColor DeceiveAreaColor(EDeceiveArea Area)
 {

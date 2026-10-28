@@ -148,6 +148,8 @@ Alpha → Opacity Mask, Shading Model = Unlit, Blend Mode = Masked 로 두고 �
 
 | 함수 | 역할 |
 | --- | --- |
+| `SetFlag(Name, Value)` / `GetFlag(Name, Default)` | 범용 플래그 (이름 → 정수) |
+| `HasFlag(Name)` / `ClearFlag(Name)` / `GetFlags()` | 〃 |
 | `RecordChoice(FChoiceRecord)` | 저장. 같은 `ChoiceId` 면 기존 기록을 덮어씀 |
 | `GetChoiceRecords()` | 전체 기록 |
 | `TryGetChoice(ChoiceId, bOutChoseB)` | 그 질문에 답했는지와 무엇을 골랐는지 |
@@ -155,8 +157,12 @@ Alpha → Opacity Mask, Shading Model = Unlit, Blend Mode = Masked 로 두고 �
 | `EndGame()` | **종료 처리.** 이때부터 요약 화면이 뜸 |
 | `IsGameFinished()` | 종료됐는지 |
 
-기록은 `FChoiceRecord` 로, `ChoiceId` / `Speaker` / `Question` / `ChosenLabel` /
-`bChoseB` 를 담습니다. 요약 화면에 그대로 쓰려고 질문과 라벨 텍스트까지 보관합니다.
+**플래그가 기억의 본체입니다.** 이름 → 정수 맵이라 답변(0 = 첫 선택지), 주운 물건,
+열어 둔 문, 횟수 무엇이든 담을 수 있습니다. 선택을 기록하면 `ChoiceId` 가 그대로
+플래그 이름이 되고, `TryGetChoice` 도 플래그를 읽습니다.
+
+`FChoiceRecord`(`ChoiceId` / `Speaker` / `Question` / `ChosenLabel` / `bChoseB`) 는
+**종료 요약 화면에 보여주기 위한 것**입니다. 질문과 라벨 텍스트까지 들고 있습니다.
 
 **요약은 게임 중에는 절대 뜨지 않습니다.** `EndGame()` 이 불린 뒤에만 `ADeceiveHUD`
 가 전체 화면 목록을 그리고, 그 시점부터 이동과 상호작용도 막힙니다.
@@ -209,17 +215,11 @@ LogDeceive: Interact: SpriteCharacter_0 interacted with InteractableBox_0
 | -Y 팔 끝 | 다음 거리 |
 
 `AAreaTransition` 이 포탈입니다. **그 안에 서 있는 것만으로는 아무 일도 일어나지
-않습니다.** 상호작용 대상(`IInteractable`)이라 "F" 프롬프트가 뜨고, F 를 눌러 질문에
-답해야 이동합니다.
+않습니다.** 상호작용 대상(`IInteractable`)이라 **"이동한다"** 프롬프트가 뜨고,
+**F 를 누르면 바로 이동**합니다.
 
-| 목적지 | 질문 | 선택지 |
-| --- | --- | --- |
-| 건물 | 건물에 들어갈까? | 들어간다 / 안 들어간다 |
-| 다음 거리 | 다음 장소로 이동할까? | 이동한다 / 남아있는다 |
-| 골목길 (방에서 나갈 때) | 밖으로 나갈까? | 나간다 / 남아있는다 |
-
-**첫 번째 선택지가 항상 이동**, 두 번째가 남는 쪽입니다. 문구는 `AAreaTransition` 의
-`Dialogue` (`FDialogueData`) 에 들어 있고, 비워두면 목적지에 맞춰 자동으로 채워집니다.
+프롬프트가 이미 무엇이 일어날지 말하고 있으므로, 같은 것을 다시 묻는 질문 단계는
+두지 않았습니다. 문구는 `AAreaTransition::InteractPrompt` 로 바꿉니다.
 
 이동은 **다음 틱에** 일어납니다 — `TravelTo` 가 포탈 자신을 파괴하므로 호출 스택을
 빠져나온 뒤에 실행해야 합니다.
@@ -286,6 +286,27 @@ Travelled to Building, entry 'Door', placed at X=0 Y=0 Z=120
 2. `ADeceiveArea` 상속 액터 작성 (`CreateBoxes` 로 박스 개수 확보 →
    `OnConstruction` 에서 `LayOutBox`, `SpawnContents` 에서 출입구 스폰)
 3. `ADeceiveGameMode::SpawnArea` 에 분기 추가
+
+## 데이터 파일 (`Content/Data`)
+
+대사와 아이템은 **JSON 파일**에서 읽습니다. 고쳐도 빌드가 필요 없습니다.
+
+| 파일 | 내용 |
+| --- | --- |
+| `Dialogues.json` | 대사 묶음. 이름 → `FDialogueData` |
+| `Items.json` | 상호작용 오브젝트. 이름 → `FItemData` |
+
+`UDeceiveDataSubsystem`(GameInstance 서브시스템) 이 게임 인스턴스가 만들어질 때
+한 번 읽습니다. 실행 중에 다시 읽으려면 콘솔에 `ReloadData`.
+
+아이템은 자기 `area` 가 생길 때 `ADeceiveArea::SpawnContents` 가 스폰합니다 —
+영역마다 코드를 고칠 필요 없이 `Items.json` 에 줄만 추가하면 됩니다.
+
+**두 파일 모두 UTF-8 BOM 으로 저장해야 합니다.** BOM 이 없으면 언리얼이 한글을
+깨뜨립니다.
+
+포탈은 대사를 하지 않으므로 데이터가 필요 없습니다 — 프롬프트 문구만 있고,
+그것은 `AAreaTransition::InteractPrompt` 에 있습니다.
 
 ## 카메라
 

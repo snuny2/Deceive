@@ -84,30 +84,75 @@ PNG를 Content Browser에 끌어다 놓은 뒤, 더블클릭해서:
 
 ---
 
-## 2. 대사
+## 2. 대사와 아이템 — `Content/Data/*.json`
 
-### 구조
+**대사와 아이템은 JSON 파일에 있습니다. 고쳐도 빌드가 필요 없습니다.**
+저장하고 Play 만 다시 누르면 됩니다 (실행 중이면 콘솔에 `ReloadData`).
 
-`InteractableBox` 의 `Dialogue` (`FDialogueData`) 하나에 전부 들어 있습니다.
+두 파일 모두 **UTF-8 BOM** 으로 저장해야 한글이 깨지지 않습니다. 메모장은 "UTF-8
+(BOM)", VS Code 는 우하단 인코딩에서 "UTF-8 with BOM" 을 고르세요.
+
+### `Content/Data/Items.json`
+
+```json
+{
+  "WoodenBox": {
+    "label": "Item_WoodenBox",
+    "prompt": "조사한다",
+    "dialogue": "WoodenBox",
+    "size": 150,
+    "area": "Alley",
+    "location": { "x": 0, "y": 0, "z": 75 }
+  }
+}
+```
+
+| 키 | 역할 |
+| --- | --- |
+| 바깥 이름 (`"WoodenBox"`) | 아이템 id |
+| `label` | 아웃라이너에 뜨는 이름 |
+| `prompt` | 상호작용 프롬프트 문구 |
+| `dialogue` | `Dialogues.json` 의 어느 항목을 말하는지 |
+| `size` | 상자 한 변 길이 |
+| `area` | `Alley` / `Building` / `NextStreet` — 그 영역이 생길 때 같이 스폰됨 |
+| `location` | 영역 기준 좌표 |
+
+**아이템을 추가하려면 이 파일에 항목을 하나 더 쓰면 끝입니다.** 코드는 건드릴 필요
+없습니다.
+
+### `Content/Data/Dialogues.json`
+
+```json
+{
+  "WoodenBox": {
+    "speaker": "나무 상자",
+    "choiceId": "WoodenBox_Lid",
+    "lines": ["첫 줄", "둘째 줄"],
+    "question": "뚜껑을 열어볼까?",
+    "choiceA": { "label": "열어본다", "resultLines": ["..."] },
+    "choiceB": { "label": "그냥 둔다", "resultLines": ["..."] }
+  }
+}
+```
 
 | 필드 | 역할 |
 | --- | --- |
-| `Speaker` | 창 위 이름 (금색). **비우면 이름 줄이 사라짐** |
-| `ChoiceId` | 선택 기록용 이름. **질문마다 다르게.** 비우면 기록은 되지만 나중에 찾을 수 없음 |
-| `Lines` | 도입부. **배열 한 칸 = 창 하나** |
-| `Question` | 선택지 질문. **비우면 선택 단계 없이 도입만 하고 끝남** |
-| `ChoiceA.Label` / `ChoiceB.Label` | 선택지 문구 (앞의 "A. " "B. " 는 자동으로 붙음) |
-| `ChoiceA.ResultLines` / `ChoiceB.ResultLines` | 선택 후 나올 줄들 |
+| `speaker` | 창 위 이름 (금색). **비우면 이름 줄이 사라짐** |
+| `choiceId` | 플래그 이름. **질문마다 다르게.** 비우면 기록도 플래그도 남지 않음 |
+| `lines` | 도입부. **배열 한 칸 = 창 하나** |
+| `question` | 선택지 질문. **비우면 선택 단계 없이 도입만 하고 끝남** |
+| `choiceA.label` / `choiceB.label` | 선택지 문구 |
+| `choiceA.resultLines` / `choiceB.resultLines` | 선택 후 나올 줄들 |
 
 진행: **도입 → 질문/선택지 → 선택별 결과 → 닫힘**
 
 ### 자주 하는 수정
 
-**선택지 없는 평범한 대사로:** `Question` 을 비우면 됩니다. `Lines` 만 재생되고 닫힙니다.
+**선택지 없는 평범한 대사로:** `question` 을 `""` 로 두면 됩니다. `lines` 만 재생되고 닫힙니다.
 
-**질문부터 바로 시작:** `Lines` 를 비우면 열자마자 질문이 뜹니다.
+**질문부터 바로 시작:** `lines` 를 `[]` 로 두면 열자마자 질문이 뜹니다.
 
-**한쪽 선택은 아무 말 없이 끝내기:** 그 선택의 `ResultLines` 를 비우면 즉시 닫힙니다.
+**한쪽 선택은 아무 말 없이 끝내기:** 그 선택의 `resultLines` 를 `[]` 로 두면 즉시 닫힙니다.
 
 **줄 길이:** 알아서 접히므로 길게 써도 됩니다. 다만 한 칸이 너무 길면 창이 세로로
 커지니, 두세 줄 분량에서 배열을 나누는 게 보기 좋습니다.
@@ -184,7 +229,7 @@ void AMyThing::Interact_Implementation(AActor* InteractingActor)
 
 | 바꾸고 싶은 것 | 어디서 |
 | --- | --- |
-| 포탈 질문·선택지 문구 | `AreaTransition → Dialogue` (비우면 목적지에 맞춰 자동) |
+| 포탈 프롬프트 문구 | `AreaTransition → Interact Prompt` (기본 "이동한다") |
 | 건물 문 위치 | `CrossAlley → Door Center Y` (기본 -700, -Y 팔 위에서의 위치) |
 | 건물 문 폭 | `CrossAlley → Door Width` (기본 300). 트리거 크기도 같이 따라감 |
 | 다음 거리 크기 | `DeceiveGameMode → Next Street Width / Depth` (기본 2000 × 500) |

@@ -233,17 +233,10 @@ void ASpriteCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 
 void ASpriteCharacter::StartDialogue(const FDialogueData& InDialogue)
 {
-	StartDialogueWithHandler(InDialogue, nullptr);
-}
-
-void ASpriteCharacter::StartDialogueWithHandler(const FDialogueData& InDialogue, TFunction<void(bool bChoseB)> OnChoiceMade)
-{
 	if (InDialogue.Lines.Num() == 0 && InDialogue.Question.IsEmpty())
 	{
 		return;
 	}
-
-	ChoiceHandler = MoveTemp(OnChoiceMade);
 
 	ActiveDialogue = InDialogue;
 	CurrentLines = InDialogue.Lines;
@@ -318,17 +311,9 @@ void ASpriteCharacter::SelectChoice(bool bChoiceB)
 	CurrentLines = Chosen.ResultLines;
 	LineIndex = 0;
 
-	// Kept past CloseDialogue, which clears the member.
-	TFunction<void(bool)> Handler = ChoiceHandler;
-
 	if (CurrentLines.Num() == 0)
 	{
 		CloseDialogue();
-	}
-
-	if (Handler)
-	{
-		Handler(bChoiceB);
 	}
 }
 
@@ -340,7 +325,6 @@ void ASpriteCharacter::CloseDialogue()
 	SelectedChoiceIndex = 0;
 	bDialogueActive = false;
 	bAwaitingChoice = false;
-	ChoiceHandler = nullptr;
 }
 
 void ASpriteCharacter::MoveSelection(int32 Delta)
