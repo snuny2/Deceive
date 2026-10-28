@@ -1,16 +1,15 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/Actor.h"
+#include "DeceiveArea.h"
 #include "CrossAlley.generated.h"
 
-class UStaticMeshComponent;
-class UMaterialInterface;
+class AInteractableBox;
 class UTexture2D;
 
 /** A cross-shaped alley built from box meshes, so no level asset is required. */
 UCLASS()
-class DECEIVE_API ACrossAlley : public AActor
+class DECEIVE_API ACrossAlley : public ADeceiveArea
 {
 	GENERATED_BODY()
 
@@ -18,6 +17,7 @@ public:
 	ACrossAlley();
 
 	virtual void OnConstruction(const FTransform& Transform) override;
+	virtual FVector GetEntryLocation(FName EntryName) const override;
 
 	/** Walkable width of each corridor. */
 	UPROPERTY(EditAnywhere, Category = "Alley", meta = (ClampMin = "100"))
@@ -27,14 +27,13 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Alley", meta = (ClampMin = "200"))
 	float ArmLength = 1200.f;
 
-	UPROPERTY(EditAnywhere, Category = "Alley", meta = (ClampMin = "100"))
-	float WallHeight = 600.f;
+	/** Doorway into the building, cut into the far side of the -Y arm. */
+	UPROPERTY(EditAnywhere, Category = "Alley|Doors", meta = (ClampMin = "50"))
+	float DoorWidth = 300.f;
 
-	UPROPERTY(EditAnywhere, Category = "Alley", meta = (ClampMin = "10"))
-	float WallThickness = 100.f;
-
-	UPROPERTY(EditAnywhere, Category = "Alley", meta = (ClampMin = "5"))
-	float FloorThickness = 20.f;
+	/** Where along the -Y arm that doorway sits. */
+	UPROPERTY(EditAnywhere, Category = "Alley|Doors")
+	float DoorCenterY = -700.f;
 
 	/** Swap this to retexture the ground. */
 	UPROPERTY(EditAnywhere, Category = "Alley|Texture")
@@ -44,21 +43,10 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Alley|Texture")
 	TObjectPtr<UTexture2D> WallTexture;
 
-	/** Optional override; defaults to Paper2D's MaskedUnlitSpriteMaterial. */
-	UPROPERTY(EditAnywhere, Category = "Alley|Texture")
-	TObjectPtr<UMaterialInterface> BaseMaterial;
-
-	/**
-	 * Stops the walls that sit between the fixed camera and the crossing from being
-	 * drawn in game. They keep their collision, so they still block movement.
-	 */
+	/** Test target dropped at the crossing. */
 	UPROPERTY(EditAnywhere, Category = "Alley")
-	bool bHideCameraSideWalls = true;
+	TSubclassOf<AInteractableBox> TestBoxClass;
 
-private:
-	/** Index 0-1 floors, 2-9 corridor walls, 10-13 arm end caps. */
-	UPROPERTY()
-	TArray<TObjectPtr<UStaticMeshComponent>> Boxes;
-
-	void LayOutBox(int32 Index, const FVector& Center, const FVector& Size, UTexture2D* Texture, bool bCameraSide = false);
+protected:
+	virtual void SpawnContents() override;
 };
