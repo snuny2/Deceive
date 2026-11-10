@@ -4,6 +4,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "DeceiveLog.h"
 #include "DeceiveDataSubsystem.h"
+#include "DeceiveGameInstance.h"
 #include "DeceiveSpriteMaterial.h"
 #include "Engine/GameInstance.h"
 #include "Engine/StaticMesh.h"
@@ -24,57 +25,90 @@ ADeceiveArea::ADeceiveArea()
 
 void ADeceiveArea::SpawnContents()
 {
-	UWorld* World = GetWorld();
 	const UGameInstance* GameInstance = GetGameInstance();
 	const UDeceiveDataSubsystem* Data = GameInstance ? GameInstance->GetSubsystem<UDeceiveDataSubsystem>() : nullptr;
+	const UDeceiveGameInstance* DeceiveGameInstance = Cast<UDeceiveGameInstance>(GameInstance);
 
-	if (!World || !Data || !ItemClass)
+	if (!Data)
 	{
 		return;
 	}
 
-	TArray<FItemData> AreaItems;
-	Data->GetItemsInArea(AreaId, AreaItems);
-
-	for (const FItemData& Item : AreaItems)
+	// What the table says stands here.
+	for (const TPair<FName, FItemData>& Entry : Data->GetItems())
 	{
-		FDialogueData Dialogue;
-		if (!Item.DialogueId.IsNone() && !Data->FindDialogue(Item.DialogueId, Dialogue))
-		{
-			UE_LOG(LogDeceive, Warning, TEXT("Item '%s' wants dialogue '%s', which Dialogues.json does not have."),
-				*Item.ItemId.ToString(), *Item.DialogueId.ToString());
-		}
+		const FItemData& Item = Entry.Value;
 
-		const FTransform SpawnTransform(Item.Location);
-		AInteractableBox* Spawned = World->SpawnActorDeferred<AInteractableBox>(ItemClass, SpawnTransform);
-		if (!Spawned)
+		// Items that only ever appear where the player leaves them are built from
+		// the placed list below instead.
+		if (Item.bPlacedOnly || Item.Area != AreaId)
 		{
 			continue;
 		}
 
-		Spawned->ApplyItemData(Item, Dialogue);
-		Spawned->FinishSpawning(SpawnTransform);
+		SpawnItem(Item, Item.Location);
+	}
+
+	// Then every copy the player has put down in this area.
+	if (!DeceiveGameInstance)
+	{
+		return;
+	}
+
+	for (const FDeceivePlacedItem& Placed : DeceiveGameInstance->GetPlacedItems())
+	{
+		FItemData Item;
+		if (Placed.Area == AreaId && Data->FindItem(Placed.ItemId, Item))
+		{
+			SpawnItem(Item, Placed.Location, Placed.PlacedId);
+		}
+	}
+}
+
+AInteractableBox* ADeceiveArea::SpawnItem(const FItemData& Item, const FVector& Location, int32 PlacedId)
+{
+	UWorld* World = GetWorld();
+	if (!World || !ItemClass)
+	{
+		return nullptr;
+	}
+
+	const FTransform SpawnTransform(Location);
+	AInteractableBox* Spawned = World->SpawnActorDeferred<AInteractableBox>(ItemClass, SpawnTransform);
+	if (!Spawned)
+	{
+		return nullptr;
+	}
+
+	Spawned->ApplyItemData(Item);
+	Spawned->PlacedId = PlacedId;
+	Spawned->FinishSpawning(SpawnTransform);
 
 #if WITH_EDITOR
-		if (!Item.Label.IsEmpty())
-		{
-			Spawned->SetActorLabel(Item.Label);
-		}
+	if (!Item.Label.IsEmpty())
+	{
+		Spawned->SetActorLabel(Item.Label);
+	}
 #endif
 
-		SpawnedContents.Add(Spawned);
-		UE_LOG(LogDeceive, Log, TEXT("Item spawned: %s at %s"), *Item.ItemId.ToString(), *Item.Location.ToString());
-	}
+	SpawnedContents.Add(Spawned);
+	UE_LOG(LogDeceive, Log, TEXT("Item spawned: %s at %s"), *Item.ItemId.ToString(), *Location.ToString());
+
+	return Spawned;
 }
 
 void ADeceiveArea::CreateBoxes(int32 Count)
 {
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMeshFinder(TEXT("/Engine/BasicShapes/Cube.Cube"));
 
-	Boxes.Reserve(Count);
+	// Numbered on from whatever is already there, so a subclass can add its own
+	// boxes in its constructor without clashing with the base class's names.
+	const int32 FirstIndex = Boxes.Num();
+	Boxes.Reserve(FirstIndex + Count);
 	for (int32 Index = 0; Index < Count; ++Index)
 	{
-		UStaticMeshComponent* Box = CreateDefaultSubobject<UStaticMeshComponent>(*FString::Printf(TEXT("Box%d"), Index));
+		UStaticMeshComponent* Box = CreateDefaultSubobject<UStaticMeshComponent>(
+			*FString::Printf(TEXT("Box%d"), FirstIndex + Index));
 		Box->SetupAttachment(GetRootComponent());
 		Box->SetStaticMesh(CubeMeshFinder.Object);
 		Box->SetCollisionProfileName(TEXT("BlockAll"));
@@ -114,6 +148,16 @@ void ADeceiveArea::LayOutBlocker(int32 Index, const FVector& Center, const FVect
 	Box->SetRelativeScale3D(Size / CubeMeshSize);
 	// Never drawn, but it keeps its collision.
 	Box->SetHiddenInGame(true);
+}
+
+void ADeceiveArea::DisableBox(int32 Index)
+{
+	if (UStaticMeshComponent* Box = Boxes.IsValidIndex(Index) ? Boxes[Index].Get() : nullptr)
+	{
+		Box->SetHiddenInGame(true);
+		Box->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Box->SetRelativeScale3D(FVector(0.01f));
+	}
 }
 
 void ADeceiveArea::BeginPlay()

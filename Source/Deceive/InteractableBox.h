@@ -7,11 +7,12 @@
 #include "Interactable.h"
 #include "InteractableBox.generated.h"
 
+class ASpriteCharacter;
 class UStaticMeshComponent;
 class UMaterialInterface;
 class UTexture2D;
 
-/** A test target: walk up to it, press the interact key, watch the log. */
+/** An object in the world that says something when interacted with. */
 UCLASS()
 class DECEIVE_API AInteractableBox : public AActor, public IInteractable
 {
@@ -24,13 +25,9 @@ public:
 
 	virtual void Interact_Implementation(AActor* InteractingActor) override;
 
-	/** Fills this object in from the data tables. Call before FinishSpawning. */
-	void ApplyItemData(const FItemData& Item, const FDialogueData& InDialogue);
-	virtual FText GetInteractPrompt_Implementation() const override { return InteractPrompt; }
-
-	/** Wording on the prompt while this is in range. */
-	UPROPERTY(EditAnywhere, Category = "Dialogue")
-	FText InteractPrompt;
+	/** Fills this object in from the item table. Call before FinishSpawning. */
+	void ApplyItemData(const FItemData& Item);
+	virtual FText GetInteractPrompt_Implementation() const override { return ItemData.InteractPrompt; }
 
 	UPROPERTY(EditAnywhere, Category = "Box", meta = (ClampMin = "10"))
 	float BoxSize = 150.f;
@@ -39,15 +36,25 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Box")
 	TObjectPtr<UTexture2D> BoxTexture;
 
-	/** What gets said, asked and answered when the player interacts. */
-	UPROPERTY(EditAnywhere, Category = "Dialogue")
-	FDialogueData Dialogue;
+	/**
+	 * Non-zero when this is a copy the player put down, which is what lets it be
+	 * picked up again. Set by the area before FinishSpawning.
+	 */
+	UPROPERTY(VisibleAnywhere, Category = "Item")
+	int32 PlacedId = 0;
+
+	/** Everything this object is, from Items.json. */
+	UPROPERTY(VisibleAnywhere, Category = "Item")
+	FItemData ItemData;
 
 	/** Optional override; defaults to Paper2D's OpaqueUnlitSpriteMaterial. */
 	UPROPERTY(EditAnywhere, Category = "Box")
 	TObjectPtr<UMaterialInterface> BaseMaterial;
 
 private:
+	/** Takes this copy back into the bag when the question was answered yes. */
+	void TakeIfAccepted(ASpriteCharacter* PlayerCharacter, FName ChoiceId);
+
 	UPROPERTY(VisibleAnywhere, Category = "Box")
 	TObjectPtr<UStaticMeshComponent> Mesh;
 };

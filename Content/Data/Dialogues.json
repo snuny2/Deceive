@@ -1,4 +1,28 @@
 ﻿{
+  "LockedDoor_Unlock": {
+    "speaker": "철문",
+    "lines": [
+      "{item}를 꽂아 돌리자, 걸쇠가 무겁게 풀렸다.",
+      "{item}는 자물쇠에 꽂힌 채 부러졌다. 더는 쓸 수 없다."
+    ]
+  },
+  "LockedDoor": {
+    "speaker": "철문",
+    "lines": [
+      "굳게 잠긴 철문이다.",
+      "열쇠 구멍에 녹이 두껍게 앉아 있다. 맞는 열쇠가 있어야 할 것 같다."
+    ]
+  },
+  "WoodenBox_Empty": {
+    "condition": {
+      "flag": "WoodenBox_Opened",
+      "value": 1
+    },
+    "speaker": "나무 상자",
+    "lines": [
+      "빈 상자다."
+    ]
+  },
   "WoodenBox": {
     "speaker": "나무 상자",
     "choiceId": "WoodenBox_Lid",
@@ -12,6 +36,13 @@
       "resultLines": [
         "뚜껑을 들어올리자 먼지가 쏟아진다.",
         "안에는 녹슨 열쇠가 하나 들어 있다. 주머니에 넣어 두었다."
+      ],
+      "setFlags": {
+        "Has_RustyKey": 1,
+        "WoodenBox_Opened": 1
+      },
+      "addItems": [
+        "RustyKey"
       ]
     },
     "choiceB": {
@@ -21,5 +52,195 @@
         "상자를 등지고 돌아섰다."
       ]
     }
+  },
+  "StonePile": {
+    "speaker": "돌무더기",
+    "choiceId": "StonePile_Take",
+    "lines": [
+      "주먹만 한 돌들이 수북이 쌓여 있다.",
+      "하나쯤 집어 가도 티가 나지 않을 것 같다."
+    ],
+    "question": "돌맹이를 집을까?",
+    "choiceA": {
+      "label": "집는다",
+      "resultLines": [
+        "돌맹이 하나를 집어 주머니에 넣었다."
+      ],
+      "addItems": [
+        "Stone"
+      ]
+    },
+    "choiceB": {
+      "label": "안 집는다",
+      "resultLines": [
+        "지금은 필요하지 않을 것 같다."
+      ]
+    }
+  },
+  "Stone": {
+    "speaker": "돌맹이",
+    "choiceId": "Stone_Take",
+    "lines": [
+      "내려놓은 돌맹이다."
+    ],
+    "question": "다시 주울까?",
+    "choiceA": {
+      "label": "줍는다",
+      "resultLines": [
+        "돌맹이를 다시 집어 들었다."
+      ]
+    },
+    "choiceB": {
+      "label": "그냥 둔다",
+      "resultLines": [
+        "그대로 두기로 했다."
+      ]
+    }
+  },
+  "Plate_Click": {
+    "speaker": "발판",
+    "lines": [
+      "발판이 내려갔다."
+    ]
+  },
+  "Gate_Open": {
+    "lines": [
+      "어디선가 문이 열리는 소리가 났다."
+    ]
+  },
+  "RewardChest_Empty": {
+    "condition": {
+      "flag": "RewardChest_Opened",
+      "value": 1
+    },
+    "speaker": "낡은 함",
+    "lines": [
+      "안은 이미 비어 있다."
+    ]
+  },
+  "RewardChest": {
+    "speaker": "낡은 함",
+    "choiceId": "RewardChest_Lid",
+    "lines": [
+      "철창 안쪽에 놓인 낡은 함이다.",
+      "오래 손대지 않은 듯 먼지가 두껍다."
+    ],
+    "question": "열어볼까?",
+    "choiceA": {
+      "label": "열어본다",
+      "resultLines": [
+        "함 안에는 손바닥만 한 장식품이 하나 들어 있었다."
+      ],
+      "setFlags": {
+        "RewardChest_Opened": 1
+      },
+      "addItems": [
+        "Trinket"
+      ]
+    },
+    "choiceB": {
+      "label": "그냥 둔다",
+      "resultLines": [
+        "아직은 열지 않기로 했다."
+      ]
+    }
+  },
+  "Gate_Close": {
+    "lines": [
+      "어디선가 문이 닫히는 소리가 났다."
+    ]
+  },
+  "Plate_Release": {
+    "speaker": "발판",
+    "lines": [
+      "발판이 올라왔다."
+    ]
+  },
+  "PuzzleDoor": {
+    "speaker": "작은 문",
+    "lines": [
+      "골목 끝에 아래로 내려가는 문이 있다.",
+      "손잡이 자리에 장식품 모양으로 파인 홈이 있다. 맞는 물건이 있어야 할 것 같다."
+    ]
+  },
+  "PuzzleDoor_Unlock": {
+    "speaker": "작은 문",
+    "lines": [
+      "{item}을 홈에 맞추자 문이 소리 없이 열렸다.",
+      "{item}은 그대로 주머니에 남았다."
+    ]
+  },
+  "WordPuzzle_Locked": {
+    "lines": [
+      "문은 꿈쩍도 하지 않는다.",
+      "바닥의 글자가 아직 완성되지 않았다."
+    ]
+  },
+  "Crate_Seated": {
+    "speaker": "상자",
+    "lines": [
+      "상자가 빈자리에 딱 들어맞았다."
+    ]
+  },
+  "WordPuzzle_Solved": {
+    "lines": [
+      "마지막 빈자리가 채워지자, 바닥의 글자가 하나로 이어졌다.",
+      "어디선가 문이 열리는 소리가 났다."
+    ]
+  },
+  "Statue_Up": {
+    "lines": [
+      "조각상이 위쪽을 바라본다."
+    ]
+  },
+  "Statue_Right": {
+    "lines": [
+      "조각상이 오른쪽을 바라본다."
+    ]
+  },
+  "Statue_Down": {
+    "lines": [
+      "조각상이 아래쪽을 바라본다."
+    ]
+  },
+  "Statue_Left": {
+    "lines": [
+      "조각상이 왼쪽을 바라본다."
+    ]
+  },
+  "StatuePuzzle_Solved": {
+    "lines": [
+      "세 조각상이 모두 같은 곳을 보자, 무거운 것이 미끄러지는 소리가 났다.",
+      "복도 끝의 문이 열려 있다."
+    ]
+  },
+  "StatueDoor": {
+    "speaker": "문",
+    "lines": [
+      "굳게 닫힌 문이다. 손잡이도 열쇠 구멍도 없다.",
+      "복도의 조각상들이 제각각 다른 곳을 보고 있다."
+    ]
+  },
+  "Statue_Turn": {
+    "speaker": "조각상",
+    "question": "어느 쪽으로 돌릴까?",
+    "choiceA": {
+      "label": "왼쪽으로 돌린다"
+    },
+    "choiceB": {
+      "label": "오른쪽으로 돌린다"
+    }
+  },
+  "StatuePuzzle_Closed": {
+    "lines": [
+      "조각상 하나가 다른 곳을 보자, 무거운 것이 도로 내려앉는 소리가 났다.",
+      "복도 끝의 문이 다시 닫혔다."
+    ]
+  },
+  "StatueDoor_Hall": {
+    "speaker": "문",
+    "lines": [
+      "굳게 닫힌 문이다. 손잡이도 열쇠 구멍도 없다."
+    ]
   }
 }

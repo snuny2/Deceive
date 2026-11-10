@@ -14,6 +14,14 @@ struct FDialogueChoice
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dialogue", meta = (MultiLine = true))
 	TArray<FText> ResultLines;
+
+	/** Flags this answer writes, such as remembering a door was opened. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dialogue")
+	TMap<FName, int32> SetFlags;
+
+	/** Entries of Inventory.json this answer puts in the player's bag. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dialogue")
+	TArray<FName> AddItems;
 };
 
 /** What the player answered at one question, kept for the end-of-game summary. */
@@ -67,4 +75,14 @@ struct FDialogueData
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dialogue")
 	FDialogueChoice ChoiceB;
+
+	/**
+	 * When set, this entry is only used while that flag equals ConditionValue.
+	 * Leave it None and the entry always applies.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dialogue|Condition")
+	FName ConditionFlag;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dialogue|Condition")
+	int32 ConditionValue = 1;
 };

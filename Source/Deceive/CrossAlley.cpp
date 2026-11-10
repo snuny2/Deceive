@@ -1,12 +1,15 @@
 #include "CrossAlley.h"
 
+#include "AreaTransition.h"
+
 namespace
 {
 	/**
 	 * Two floor slabs, eight corridor walls (one of which is split in two by the
-	 * building doorway), four arm end caps and the doorway's invisible wall.
+	 * building doorway), four arm end caps (the +Y and -X ones each split in two
+	 * by a doorway) and the three doorways' invisible walls.
 	 */
-	constexpr int32 NumAlleyBoxes = 16;
+	constexpr int32 NumAlleyBoxes = 22;
 }
 
 ACrossAlley::ACrossAlley()
@@ -78,8 +81,48 @@ void ACrossAlley::OnConstruction(const FTransform& Transform)
 	const float CapSpan = CorridorWidth + WallThickness * 2.f;
 	for (int32 Sign = -1; Sign <= 1; Sign += 2)
 	{
-		LayOutBox(Index++, FVector(Sign * CapOffset, 0.f, WallZ),
-			FVector(WallThickness, CapSpan, WallHeight), WallTexture, Sign < 0);
+		if (Sign < 0)
+		{
+			// The -X cap carries the doorway down into the room below, so it is
+			// laid out as two segments with a gap in the middle.
+			const float SegmentLength = FMath::Max((CapSpan - DoorWidth) * 0.5f, 1.f);
+			const float SegmentCenter = (DoorWidth + SegmentLength) * 0.5f;
+			for (int32 SegmentSign = -1; SegmentSign <= 1; SegmentSign += 2)
+			{
+				LayOutBox(Index++,
+					FVector(Sign * CapOffset, SegmentSign * SegmentCenter, WallZ),
+					FVector(WallThickness, SegmentLength, WallHeight), WallTexture, true);
+			}
+		}
+		else
+		{
+			// The +X cap carries the doorway up into the wide room, so it is laid
+			// out as two segments with a gap in the middle as well.
+			const float SegmentLength = FMath::Max((CapSpan - DoorWidth) * 0.5f, 1.f);
+			const float SegmentCenter = (DoorWidth + SegmentLength) * 0.5f;
+			for (int32 SegmentSign = -1; SegmentSign <= 1; SegmentSign += 2)
+			{
+				LayOutBox(Index++,
+					FVector(Sign * CapOffset, SegmentSign * SegmentCenter, WallZ),
+					FVector(WallThickness, SegmentLength, WallHeight), WallTexture, false);
+			}
+		}
+
+		if (Sign > 0)
+		{
+			// The +Y cap carries the locked door, so it is laid out as two
+			// segments with the doorway between them.
+			const float SegmentLength = FMath::Max((CapSpan - DoorWidth) * 0.5f, 1.f);
+			const float SegmentCenter = (DoorWidth + SegmentLength) * 0.5f;
+			for (int32 SegmentSign = -1; SegmentSign <= 1; SegmentSign += 2)
+			{
+				LayOutBox(Index++,
+					FVector(SegmentSign * SegmentCenter, Sign * CapOffset, WallZ),
+					FVector(SegmentLength, WallThickness, WallHeight), WallTexture);
+			}
+
+			continue;
+		}
 
 		LayOutBox(Index++, FVector(0.f, Sign * CapOffset, WallZ),
 			FVector(CapSpan, WallThickness, WallHeight), WallTexture);
@@ -90,6 +133,21 @@ void ACrossAlley::OnConstruction(const FTransform& Transform)
 	LayOutBlocker(Index++,
 		FVector(WallOffset, DoorCenterY, WallZ),
 		FVector(WallThickness, DoorWidth, WallHeight));
+
+	// Same for the locked door at the end of the +Y arm.
+	LayOutBlocker(Index++,
+		FVector(0.f, CapOffset, WallZ),
+		FVector(DoorWidth, WallThickness, WallHeight));
+
+	// And for the doorway at the end of the -X arm.
+	LayOutBlocker(Index++,
+		FVector(-CapOffset, 0.f, WallZ),
+		FVector(WallThickness, DoorWidth, WallHeight));
+
+	// And the one at the top of the +X arm, up into the wide room.
+	LayOutBlocker(Index++,
+		FVector(CapOffset, 0.f, WallZ),
+		FVector(WallThickness, DoorWidth, WallHeight));
 }
 
 FVector ACrossAlley::GetEntryLocation(FName EntryName) const
@@ -98,6 +156,24 @@ FVector ACrossAlley::GetEntryLocation(FName EntryName) const
 	{
 		// In the corridor, opposite the doorway.
 		return FVector(0.f, DoorCenterY, 120.f);
+	}
+
+	if (EntryName == TEXT("FromPuzzle"))
+	{
+		// Back up the -X arm, in front of the door down to the room below.
+		return FVector(-(ArmLength - 300.f), 0.f, 120.f);
+	}
+
+	if (EntryName == TEXT("FromEast"))
+	{
+		// Just inside the +Y arm, in front of the locked door.
+		return FVector(0.f, ArmLength - 300.f, 120.f);
+	}
+
+	if (EntryName == TEXT("FromHall"))
+	{
+		// Inside the +X arm, below the doorway up into the wide room.
+		return FVector(ArmLength - 300.f, 0.f, 120.f);
 	}
 
 	if (EntryName == TEXT("FromWest"))
@@ -129,4 +205,38 @@ void ACrossAlley::SpawnContents()
 		FVector(0.f, -(ArmLength - EdgeDepth), WallHeight * 0.5f),
 		FVector(CorridorWidth * 0.5f, EdgeDepth, WallHeight * 0.5f),
 		EDeceiveArea::NextStreet, TEXT("Door"));
+
+	// The door at the end of the -X arm, down into the room with the word in it.
+	// It needs what the barred room gives up, so the rooms are done in order.
+	if (AAreaTransition* DownDoor = SpawnTransition(
+		FVector(-(ArmLength + WallThickness * 0.5f), 0.f, WallHeight * 0.5f),
+		FVector(WallThickness * 0.5f, DoorWidth * 0.5f, WallHeight * 0.5f),
+		EDeceiveArea::PuzzleRoom, TEXT("FromAlley")))
+	{
+		DownDoor->InteractPrompt = FText::FromString(TEXT("문을 연다"));
+		DownDoor->RequiredItem = TEXT("Trinket");
+		DownDoor->bConsumeRequiredItem = false;
+		DownDoor->UnlockedFlag = TEXT("PuzzleRoomDoor_Unlocked");
+		DownDoor->LockedDialogueIds.Add(TEXT("PuzzleDoor"));
+		DownDoor->UnlockDialogueIds.Add(TEXT("PuzzleDoor_Unlock"));
+	}
+
+	// The doorway at the top of the +X arm, into the wide room beyond the statues.
+	SpawnTransition(
+		FVector(ArmLength + WallThickness * 0.5f, 0.f, WallHeight * 0.5f),
+		FVector(WallThickness * 0.5f, DoorWidth * 0.5f, WallHeight * 0.5f),
+		EDeceiveArea::StatueHall, TEXT("FromAlley"));
+
+	// The locked door at the end of the +Y arm, filling the gap in that end cap.
+	if (AAreaTransition* LockedDoor = SpawnTransition(
+		FVector(0.f, ArmLength + WallThickness * 0.5f, WallHeight * 0.5f),
+		FVector(DoorWidth * 0.5f, WallThickness * 0.5f, WallHeight * 0.5f),
+		EDeceiveArea::LockedRoom, TEXT("Door")))
+	{
+		LockedDoor->InteractPrompt = FText::FromString(TEXT("문을 연다"));
+		LockedDoor->RequiredItem = TEXT("RustyKey");
+		LockedDoor->LockedDialogueIds.Add(TEXT("LockedDoor"));
+		LockedDoor->UnlockDialogueIds.Add(TEXT("LockedDoor_Unlock"));
+		LockedDoor->UnlockedFlag = TEXT("LockedDoor_Unlocked");
+	}
 }

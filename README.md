@@ -302,6 +302,38 @@ Travelled to Building, entry 'Door', placed at X=0 Y=0 Z=120
 아이템은 자기 `area` 가 생길 때 `ADeceiveArea::SpawnContents` 가 스폰합니다 —
 영역마다 코드를 고칠 필요 없이 `Items.json` 에 줄만 추가하면 됩니다.
 
+### 플래그로 대사 고르기
+
+아이템의 `dialogue` 는 이름 하나도, **후보 목록**도 될 수 있습니다. 상호작용할 때마다
+**조건이 맞는 첫 항목**이 쓰이므로, 조건부 대사를 앞에 두고 기본 대사를 맨 뒤에 둡니다.
+
+```json
+"dialogue": [ "WoodenBox_Empty", "WoodenBox" ]
+```
+
+대사 항목의 `condition` 은 플래그 하나를 봅니다. 없으면 항상 통과합니다.
+
+```json
+"condition": { "flag": "WoodenBox_Opened", "value": 1 }
+```
+
+선택지는 `setFlags` 로 플래그를 씁니다.
+
+```json
+"setFlags": { "Has_RustyKey": 1, "WoodenBox_Opened": 1 }
+```
+
+나무 상자가 이 방식으로 되어 있습니다 — 열면 두 플래그가 서고, 다시 조사하면
+`WoodenBox_Empty` 의 조건이 맞아 "빈 상자다." 가 나옵니다.
+
+**조건은 상호작용할 때마다 다시 풉니다.** 스폰할 때 한 번 정하는 게 아닙니다.
+
+### 패키징
+
+`Content/Data` 는 애셋이 아니라서 쿡되지 않습니다. `Config/DefaultGame.ini` 에
+`+DirectoriesToAlwaysStageAsNonUFS=(Path="Data")` 를 넣어 패키징 시 그대로 복사되게
+해 뒀습니다 (경로는 Content 폴더 기준).
+
 **두 파일 모두 UTF-8 BOM 으로 저장해야 합니다.** BOM 이 없으면 언리얼이 한글을
 깨뜨립니다.
 

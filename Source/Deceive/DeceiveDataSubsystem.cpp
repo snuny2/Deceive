@@ -1,5 +1,6 @@
 #include "DeceiveDataSubsystem.h"
 
+#include "DeceiveGameInstance.h"
 #include "DeceiveLog.h"
 #include "Dom/JsonObject.h"
 #include "Misc/FileHelper.h"
@@ -17,9 +18,11 @@ void UDeceiveDataSubsystem::ReloadData()
 {
 	LoadDialogues();
 	LoadItems();
+	LoadInventory();
+	LoadPlayer();
 
-	UE_LOG(LogDeceive, Log, TEXT("Data loaded: %d dialogue(s), %d item(s)."),
-		Dialogues.Num(), Items.Num());
+	UE_LOG(LogDeceive, Log, TEXT("Data loaded: %d dialogue(s), %d item(s), %d inventory entr(ies)."),
+		Dialogues.Num(), Items.Num(), InventoryItems.Num());
 }
 
 TSharedPtr<FJsonObject> UDeceiveDataSubsystem::LoadDataFile(const TCHAR* FileName)
@@ -68,8 +71,31 @@ FDialogueChoice UDeceiveDataSubsystem::ReadChoice(const TSharedPtr<FJsonObject>&
 		return Choice;
 	}
 
-	Choice.Label = FText::FromString(Object->GetStringField(TEXT("label")));
+	FString Label;
+	if (Object->TryGetStringField(TEXT("label"), Label))
+	{
+		Choice.Label = FText::FromString(Label);
+	}
+
 	Choice.ResultLines = ReadTextArray(Object, TEXT("resultLines"));
+
+	const TArray<TSharedPtr<FJsonValue>>* AddItems = nullptr;
+	if (Object->TryGetArrayField(TEXT("addItems"), AddItems))
+	{
+		for (const TSharedPtr<FJsonValue>& Value : *AddItems)
+		{
+			Choice.AddItems.Add(FName(*Value->AsString()));
+		}
+	}
+
+	const TSharedPtr<FJsonObject>* FlagsObject = nullptr;
+	if (Object->TryGetObjectField(TEXT("setFlags"), FlagsObject))
+	{
+		for (const TPair<FString, TSharedPtr<FJsonValue>>& Flag : (*FlagsObject)->Values)
+		{
+			Choice.SetFlags.Add(FName(*Flag.Key), static_cast<int32>(Flag.Value->AsNumber()));
+		}
+	}
 
 	return Choice;
 }
@@ -93,10 +119,32 @@ void UDeceiveDataSubsystem::LoadDialogues()
 		}
 
 		FDialogueData Dialogue;
-		Dialogue.Speaker = FText::FromString((*Object)->GetStringField(TEXT("speaker")));
-		Dialogue.ChoiceId = FName(*(*Object)->GetStringField(TEXT("choiceId")));
+
+		FString Field;
+		if ((*Object)->TryGetStringField(TEXT("speaker"), Field))
+		{
+			Dialogue.Speaker = FText::FromString(Field);
+		}
+		if ((*Object)->TryGetStringField(TEXT("choiceId"), Field))
+		{
+			Dialogue.ChoiceId = FName(*Field);
+		}
+		if ((*Object)->TryGetStringField(TEXT("question"), Field))
+		{
+			Dialogue.Question = FText::FromString(Field);
+		}
+
 		Dialogue.Lines = ReadTextArray(*Object, TEXT("lines"));
-		Dialogue.Question = FText::FromString((*Object)->GetStringField(TEXT("question")));
+
+		const TSharedPtr<FJsonObject>* ConditionObject = nullptr;
+		if ((*Object)->TryGetObjectField(TEXT("condition"), ConditionObject))
+		{
+			Dialogue.ConditionFlag = FName(*(*ConditionObject)->GetStringField(TEXT("flag")));
+
+			double ConditionValue = 1.0;
+			(*ConditionObject)->TryGetNumberField(TEXT("value"), ConditionValue);
+			Dialogue.ConditionValue = static_cast<int32>(ConditionValue);
+		}
 
 		const TSharedPtr<FJsonObject>* ChoiceObject = nullptr;
 		if ((*Object)->TryGetObjectField(TEXT("choiceA"), ChoiceObject))
@@ -134,8 +182,27 @@ void UDeceiveDataSubsystem::LoadItems()
 		Item.ItemId = FName(*Entry.Key);
 		Item.Label = (*Object)->GetStringField(TEXT("label"));
 		Item.InteractPrompt = FText::FromString((*Object)->GetStringField(TEXT("prompt")));
-		Item.DialogueId = FName(*(*Object)->GetStringField(TEXT("dialogue")));
-		Item.Size = (*Object)->GetNumberField(TEXT("size"));
+		// "dialogue" takes either one name or a list of them.
+		const TArray<TSharedPtr<FJsonValue>>* DialogueList = nullptr;
+		FString SingleDialogue;
+		if ((*Object)->TryGetArrayField(TEXT("dialogue"), DialogueList))
+		{
+			for (const TSharedPtr<FJsonValue>& Value : *DialogueList)
+			{
+				Item.DialogueIds.Add(FName(*Value->AsString()));
+			}
+		}
+		else if ((*Object)->TryGetStringField(TEXT("dialogue"), SingleDialogue))
+		{
+			Item.DialogueIds.Add(FName(*SingleDialogue));
+		}
+
+		double Size = 150.0;
+		(*Object)->TryGetNumberField(TEXT("size"), Size);
+		Item.Size = static_cast<float>(Size);
+
+		(*Object)->TryGetBoolField(TEXT("placedOnly"), Item.bPlacedOnly);
+		(*Object)->TryGetBoolField(TEXT("walkThrough"), Item.bWalkThrough);
 
 		const FString AreaName = (*Object)->GetStringField(TEXT("area"));
 		if (!DeceiveAreaFromName(AreaName, Item.Area))
@@ -158,6 +225,84 @@ void UDeceiveDataSubsystem::LoadItems()
 	}
 }
 
+void UDeceiveDataSubsystem::LoadInventory()
+{
+	InventoryItems.Reset();
+
+	const TSharedPtr<FJsonObject> Root = LoadDataFile(TEXT("Inventory.json"));
+	if (!Root.IsValid())
+	{
+		return;
+	}
+
+	for (const TPair<FString, TSharedPtr<FJsonValue>>& Entry : Root->Values)
+	{
+		const TSharedPtr<FJsonObject>* Object = nullptr;
+		if (!Entry.Value->TryGetObject(Object))
+		{
+			continue;
+		}
+
+		FInventoryItemData Item;
+		Item.ItemId = FName(*Entry.Key);
+
+		FString Field;
+		if ((*Object)->TryGetStringField(TEXT("name"), Field))
+		{
+			Item.Name = FText::FromString(Field);
+		}
+		if ((*Object)->TryGetStringField(TEXT("description"), Field))
+		{
+			Item.Description = FText::FromString(Field);
+		}
+		(*Object)->TryGetStringField(TEXT("texture"), Item.TexturePath);
+		(*Object)->TryGetBoolField(TEXT("placeable"), Item.bPlaceable);
+
+		InventoryItems.Add(Item.ItemId, Item);
+	}
+}
+
+bool UDeceiveDataSubsystem::FindInventoryItem(FName ItemId, FInventoryItemData& OutItem) const
+{
+	if (const FInventoryItemData* Found = InventoryItems.Find(ItemId))
+	{
+		OutItem = *Found;
+		return true;
+	}
+
+	return false;
+}
+
+void UDeceiveDataSubsystem::LoadPlayer()
+{
+	// Defaults stand in whenever the file is missing a field, so the info tab
+	// always has something to draw.
+	PlayerData = FDeceivePlayerData();
+	PlayerData.Name = FText::FromString(TEXT("이름 없음"));
+	PlayerData.Status = FText::FromString(TEXT("멀쩡하다."));
+
+	const TSharedPtr<FJsonObject> Root = LoadDataFile(TEXT("Player.json"));
+	if (!Root.IsValid())
+	{
+		return;
+	}
+
+	FString Field;
+	if (Root->TryGetStringField(TEXT("name"), Field))
+	{
+		PlayerData.Name = FText::FromString(Field);
+	}
+	if (Root->TryGetStringField(TEXT("status"), Field))
+	{
+		PlayerData.Status = FText::FromString(Field);
+	}
+	Root->TryGetStringField(TEXT("portrait"), PlayerData.PortraitPath);
+
+	double MaxHealth = PlayerData.MaxHealth;
+	Root->TryGetNumberField(TEXT("maxHealth"), MaxHealth);
+	PlayerData.MaxHealth = FMath::Max(1, static_cast<int32>(MaxHealth));
+}
+
 bool UDeceiveDataSubsystem::FindDialogue(FName DialogueId, FDialogueData& OutDialogue) const
 {
 	if (const FDialogueData* Found = Dialogues.Find(DialogueId))
@@ -174,6 +319,37 @@ bool UDeceiveDataSubsystem::FindItem(FName ItemId, FItemData& OutItem) const
 	if (const FItemData* Found = Items.Find(ItemId))
 	{
 		OutItem = *Found;
+		return true;
+	}
+
+	return false;
+}
+
+bool UDeceiveDataSubsystem::ResolveDialogue(const TArray<FName>& Candidates, FDialogueData& OutDialogue, FName& OutDialogueId) const
+{
+	const UDeceiveGameInstance* GameInstance = Cast<UDeceiveGameInstance>(GetGameInstance());
+
+	for (const FName& Candidate : Candidates)
+	{
+		const FDialogueData* Found = Dialogues.Find(Candidate);
+		if (!Found)
+		{
+			UE_LOG(LogDeceive, Warning, TEXT("Dialogues.json has no entry '%s'."), *Candidate.ToString());
+			continue;
+		}
+
+		// No condition means the entry always applies, so it belongs last.
+		if (!Found->ConditionFlag.IsNone())
+		{
+			const int32 Current = GameInstance ? GameInstance->GetFlag(Found->ConditionFlag) : 0;
+			if (Current != Found->ConditionValue)
+			{
+				continue;
+			}
+		}
+
+		OutDialogue = *Found;
+		OutDialogueId = Candidate;
 		return true;
 	}
 

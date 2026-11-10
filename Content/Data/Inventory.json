@@ -1,0 +1,18 @@
+﻿{
+  "RustyKey": {
+    "name": "녹슨 열쇠",
+    "description": "나무 상자 안에 들어 있던 작은 열쇠다. 손잡이에 희미한 문양이 새겨져 있지만, 녹에 덮여 잘 보이지 않는다.",
+    "texture": ""
+  },
+  "Stone": {
+    "name": "돌맹이",
+    "description": "돌무더기에서 집어 온 주먹만 한 돌맹이다. 필요한 자리에 내려놓을 수 있다.",
+    "texture": "",
+    "placeable": true
+  },
+  "Trinket": {
+    "name": "낡은 장식품",
+    "description": "철창 안 함에 들어 있던 장식품이다. 무엇에 쓰는 물건인지는 아직 모르겠다.",
+    "texture": ""
+  }
+}

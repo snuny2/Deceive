@@ -123,7 +123,7 @@ Claude Code는 텍스트 파일만 만들 수 있어서 **언리얼 바이너리
 | 파일 | 내용 |
 | --- | --- |
 | `Dialogues.json` | 이름 → `FDialogueData` |
-| `Items.json` | 이름 → `FItemData` (라벨, 프롬프트, 대사 id, 크기, 영역, 좌표) |
+| `Items.json` | 이름 → `FItemData` (라벨, 프롬프트, 대사 후보 목록, 크기, 영역, 좌표) |
 
 `UDeceiveDataSubsystem`(GameInstance 서브시스템) 이 인스턴스 생성 시 한 번 읽고,
 콘솔 `ReloadData` 로 다시 읽습니다. 아이템은 자기 `area` 가 생길 때
@@ -131,6 +131,24 @@ Claude Code는 텍스트 파일만 만들 수 있어서 **언리얼 바이너리
 
 **두 파일 모두 UTF-8 BOM 필수.** BOM 이 없으면 `FFileHelper::LoadFileToString` 이
 한글을 깨뜨립니다.
+
+패키징 시 복사되도록 `Config/DefaultGame.ini` 에
+`+DirectoriesToAlwaysStageAsNonUFS=(Path="Data")` 를 넣어 뒀습니다 (Content 기준 경로).
+
+### 플래그로 대사 고르기
+
+아이템의 `dialogue` 는 **후보 목록**입니다. 상호작용할 때마다
+`UDeceiveDataSubsystem::ResolveDialogue` 가 **조건이 맞는 첫 항목**을 고릅니다 —
+조건부를 앞에, 조건 없는 기본을 맨 뒤에.
+
+- 대사 항목의 `condition` = `{flag, value}`. `ConditionFlag` 가 None 이면 항상 통과
+- 선택지의 `setFlags` = `{이름: 값}`. 고르는 순간 `SelectChoice` 가 적용
+
+**조건은 상호작용할 때마다 다시 풉니다** — 스폰 시 한 번 굽지 않습니다.
+그래서 `AInteractableBox` 는 대사가 아니라 `FItemData` 를 들고 있습니다.
+
+나무 상자: 열면 `Has_RustyKey` / `WoodenBox_Opened` 가 서고, 다시 조사하면
+`WoodenBox_Empty` ("빈 상자다.") 가 나옵니다.
 
 포탈 대사만 예외로 코드에 있습니다 — 목적지에서 문구가 자동으로 나오기 때문입니다.
 
@@ -140,9 +158,9 @@ Claude Code는 텍스트 파일만 만들 수 있어서 **언리얼 바이너리
 `ChoiceA`, `ChoiceB`. 진행은 **도입 → 질문/선택지 → 선택별 결과 → 닫힘**.
 `Question` 을 비우면 선택 단계 없이 끝납니다. 대사 중에는 이동이 막힙니다.
 
-선택의 결과로 **무언가를 실행할 방법은 아직 없습니다.** 포탈이 쓰던
-`StartDialogueWithHandler` 가 있었지만, 포탈이 질문을 안 하게 되면서 쓰는 곳이
-없어져 지웠습니다. 다시 필요해지면 되살리면 됩니다.
+선택의 결과로 할 수 있는 일은 **플래그를 세우는 것**(`setFlags`) 뿐입니다. 임의의
+코드를 실행할 방법은 없습니다 — 포탈이 쓰던 `StartDialogueWithHandler` 가 있었지만
+포탈이 질문을 안 하게 되면서 지웠습니다. 다시 필요해지면 되살리면 됩니다.
 
 ### 플래그와 선택 기록
 
@@ -182,6 +200,9 @@ GameInstance 를 골랐습니다 — 주인공 3명 전환이 들어오면 필�
   `EndGame` → 요약 표시, 포탈 상호작용 → 선택 → `Travelled to ...`
 - 포탈 치수를 로그와 수식 계산으로 교차 확인 (구멍 vs 트리거 세 축 일치),
   투명벽 두 개의 위치·크기·`bHiddenInGame`
+- **조건부 대사와 플래그**: 첫 조사 → `Interact: ... says 'WoodenBox'`,
+  "열어본다" → `Flag set: Has_RustyKey = 1` / `WoodenBox_Opened = 1`,
+  다시 조사 → `says 'WoodenBox_Empty'` 와 화면의 "빈 상자다."
 - **JSON 전환 후 동작 동일성**: `Data loaded: 1 dialogue(s), 1 item(s).`,
   `Item spawned: WoodenBox at X=0 Y=0 Z=75`(이전 하드코딩 위치와 같음),
   화면의 화자·도입·질문·선택지·결과 문구가 전부 이전과 동일,
@@ -195,8 +216,8 @@ GameInstance 를 골랐습니다 — 주인공 3명 전환이 들어오면 필�
   (한 줄 분기)
 - 플래그의 `GetFlag` / `HasFlag` / `ClearFlag` — `SetFlag` 만 로그로 확인했고,
   나머지는 `TryGetChoice` 를 통해 간접적으로만 쓰임
-- **JSON 파일이 패키징된 빌드에 포함되는지** — `Content/Data` 는 쿡 대상이 아니라서
-  Project Settings 의 "Additional Non-Asset Directories to Package" 에 넣어야 함
+- **패키징한 빌드에서 JSON 이 실제로 복사되는지** — `DefaultGame.ini` 설정은 넣었지만
+  패키징을 돌려보지는 않았음
 - 에디터 뷰포트에서의 `OnConstruction` 실시간 반영
 - 실제 텍스처를 넣었을 때의 모양 (플레이스홀더로만 확인)
 
@@ -217,6 +238,19 @@ GameInstance 를 골랐습니다 — 주인공 3명 전환이 들어오면 필�
 - **`UInputAction::bConsumeInput` 기본값이 true.** 이동과 UI 가 같은 키를 공유하면
   이동이 먼저 삼켜서 UI 가 안 먹습니다. `MoveAction->bConsumeInput = false` 로 해결.
   이동 키와 UI 키를 공유할 때마다 재발하는 문제입니다.
+
+### 파괴된 액터를 한 프레임 더 들고 있음
+
+포탈을 쓰면 `TravelTo` 가 영역과 그 포탈들을 파괴하는데, **플레이어가 들고 있던
+`CurrentInteractable` 은 그 프레임 동안 죽은 액터를 계속 가리킵니다.** 그 상태로
+`Execute_GetInteractPrompt` 를 부르면 빈 FText 가 돌아오고, HUD 가 대체값
+("조사한다") 을 그려서 포탈을 쓸 때마다 엉뚱한 문구가 한 프레임 번쩍였습니다.
+
+`GetCurrentInteractable()` 이 `IsValid` 로 걸러서 해결했습니다. 겹침 목록도 같은
+프레임에 파괴된 액터를 담을 수 있으므로 후보 루프에서도 거릅니다.
+
+> 이 증상은 **소환(`summon`)한 포탈로는 재현되지 않습니다.** 영역이 소유하지 않아
+> 파괴되지 않기 때문입니다. 영역이 스폰한 진짜 포탈이어야 합니다.
 
 ### 지오메트리
 
@@ -254,8 +288,8 @@ GameInstance 를 골랐습니다 — 주인공 3명 전환이 들어오면 필�
 - 전환 연출 (페이드 등) — 지금은 한 프레임에 즉시 바뀜
 - 엔딩 자체 (`EndGame()` 을 부르는 곳)
 - 선택 기록의 디스크 저장 (`USaveGame`) — 지금은 프로세스가 끝나면 사라짐
-- 플래그를 읽어 대사를 분기시키는 실제 사용처 (`GetFlag` / `TryGetChoice` 는 준비됨)
-- 선택의 결과로 플래그를 세우거나 무언가를 실행하는 수단 (대사는 텍스트만 출력)
+- 플래그를 **비교 조건**으로만 볼 수 있음 (같다/다르다뿐, 크다·작다·AND·OR 없음)
+- 선택의 결과로 임의의 코드를 실행하는 수단 (플래그 설정만 가능)
 - `Dialogues.json` 에 조건부 줄 (플래그에 따라 다른 대사) 을 쓸 방법
 - 선택지 3개 이상 (지금은 A/B 2개 고정)
 - 대사창 크기가 내용에 따라 바뀌는 문제 (사용자가 나중으로 미뤄둠)
@@ -287,3 +321,271 @@ GameInstance 를 골랐습니다 — 주인공 3명 전환이 들어오면 필�
 빠른 확인:
 `UnrealEditor-Cmd.exe Deceive.uproject /Engine/Maps/Entry -game`
 (단 위에 적은 PlayerStart 문제가 있습니다)
+
+### 헤드리스 실행이 현재 깨져 있음
+
+`Deceive.exe -game -nullrhi` 가 게임 코드에 도달하기 전에
+`FGenerationInfo::Serialize` 어서션으로 죽습니다 (패키지 요약 읽기).
+HEAD 코드로 되돌려 빌드해도 똑같이 죽으므로 **코드 문제가 아니라 환경 문제**입니다.
+그동안 쓰던 로그 기반 검증은 당분간 안 되고, 에디터에서 직접 확인해야 합니다.
+
+### 에디터에서 테스트할 때는 `DeceiveEditor` 타깃을 빌드해야 함
+
+`Deceive`(게임 실행 파일)만 빌드하면 에디터는 예전 `UnrealEditor-Deceive.dll` 을
+계속 읽습니다. 암전 작업에서 이걸로 "코드가 안 먹는다"는 오진을 했습니다.
+에디터 확인이 목적이면:
+
+```
+Build.bat DeceiveEditor Win64 Development -Project=<...>\Deceive.uproject
+```
+
+### 인벤토리
+
+`I` 로 열고 닫습니다. 데이터는 `Content/Data/Inventory.json`,
+보유 목록은 `UDeceiveGameInstance::Inventory`(12칸), 화면은
+`ADeceiveHUD::DrawInventory`. 아이템은 대사 선택지의 `addItems` 로 들어옵니다.
+
+남은 중복 하나: 나무 상자의 `열어본다` 는 `Has_RustyKey` 플래그와
+`addItems: ["RustyKey"]` 를 둘 다 설정합니다. 지금은 플래그 쪽을 아무도 읽지
+않으니, 조건 대사에 쓸 생각이 없으면 지워도 됩니다.
+
+### 잠긴 문
+
+`CrossAlley` 오른쪽(+Y) 팔 끝 벽에 구멍을 내고 `AAreaTransition` 을 하나 더
+두었습니다. `RequiredItem` 이 비어 있지 않으면 그 아이템을 들고 있을 때만
+이동하고, 없으면 `LockedDialogueIds` 로 대사를 띄웁니다 (`AAreaTransition::SayLocked`).
+목적지는 새 영역 `EDeceiveArea::LockedRoom` 이고, 돌아오는 입구는 "FromEast" 입니다.
+
+`CrossAlley` 의 박스 개수는 18개입니다 — 칸을 추가/삭제하면
+`NumAlleyBoxes` 도 같이 고쳐야 합니다.
+
+### 메뉴 화면과 저장
+
+인벤토리 화면이 **탭 메뉴**가 됐습니다 (정보 / 인벤토리 / 저장 / 설정).
+상태는 `ASpriteCharacter` 에 있습니다 — `bMenuOpen`, `ActiveTab`,
+`bFocusOnTabs`(커서가 탭 띠에 있는지), `SelectedItemIndex`, `SelectedSaveIndex`.
+그리기는 `ADeceiveHUD::DrawMenu` 가 탭 띠를 그리고 탭별 함수로 넘깁니다.
+
+저장은 `UDeceiveSaveGame` + `UGameplayStatics::SaveGameToSlot` 입니다.
+칸 목록은 `Deceive_00` ~ `Deceive_19` 를 `DoesSaveGameExist` 로 훑어서 만들고
+(별도 인덱스 파일 없음), 메뉴를 열 때와 저장 직후에만 갱신해서 캐시합니다.
+
+아직 안 된 것:
+- 정보 / 설정 탭은 빈 자리 표시만
+- 저장 삭제, 덮어쓰기 선택, 불러오기 확인 절차 없음 (고르면 바로 불러옴)
+- 대사 도중 상태는 저장되지 않음 — 대사 중에는 메뉴가 안 열리므로 문제되지 않음
+
+### 알림 상자
+
+`ASpriteCharacter::ShowNotice(FText)` 가 화면 가운데에 몇 초짜리 문구 상자를
+띄웁니다 (`NoticeDuration`, 월드 시간 기준 만료). 그리는 쪽은
+`ADeceiveHUD::DrawNotice` 이고, 메뉴와 대사창 **뒤에** 그려서 메뉴를 닫는
+불러오기에서도 보입니다. 저장/불러오기 결과를 알리는 데 쓰고 있습니다.
+
+저장 기록은 전용 상자 안에 그리고, 상자에 안 들어가는 줄은 아예 그리지 않습니다
+(잘려 보이지 않게). 넘치면 오른쪽에 스크롤바가 생깁니다.
+
+### 저장 목록 스크롤
+
+캔버스에는 클리핑이 없어서 `DrawClippedRect` / `DrawClippedBorder` 로 직접
+자릅니다. 목록은 **픽셀 단위**로 스크롤하고, 스크롤량은 선택된 줄이 상자 안에
+완전히 들어오도록 매 프레임 계산합니다 (HUD에 상태를 두지 않음).
+글자는 반쪽으로 못 그리므로, 그 줄이 상자 안에 완전히 들어왔을 때만 그립니다.
+
+이전 버전은 "통째로 들어가는 줄만 그린다"였는데, 그래서 마지막 칸이 통째로
+사라져 저장이 안 된 것처럼 보였습니다.
+
+### 방 모양과 문 위치
+
+`ARoomArea` 가 `DoorSide`(Front / Left / Right)를 받습니다. 벽 네 개 중
+해당하는 하나만 문 폭만큼 갈라서 깔고, 막는 벽·복귀 포탈·입장 위치가 모두
+`GetDoorwayCenter()` 를 따라갑니다. 박스 개수는 그대로 7개입니다
+(갈라진 벽이 1개 대신 2개).
+
+- 왼쪽 거리(NextStreet): 500 × 2600 세로 복도, 문은 Right
+- 잠긴 방(LockedRoom): 1600 × 1600 정사각, 문은 Left
+- 건물(Building): 900 × 700, 문은 Front (그대로)
+
+람다 인자 이름을 `bHidden` 으로 두면 `AActor::bHidden` 을 가려서 빌드가
+실패합니다 (C4458, WarningsAsErrors).
+
+### 소모성 열쇠
+
+`AAreaTransition` 의 잠금 부분이 늘었습니다 — `UnlockDialogueIds`,
+`bConsumeRequiredItem`(기본 true), `UnlockedFlag`. 여는 순서는
+플래그 세우기 → 아이템 소모 → 여는 대사 → **대사가 닫힐 때 이동** 입니다.
+
+대사가 끝난 뒤에 무언가를 하려고 `ASpriteCharacter::StartDialogueThen(대사,
+FSimpleDelegate)` 를 추가했습니다. `CloseDialogue` 에서 핸들러를 먼저 떼어내고
+실행하므로, 핸들러가 또 다른 대사를 시작해도 안전합니다.
+
+여는 대사의 `{item}` 은 `UDeceiveDataSubsystem::FindInventoryItem` 으로 찾은
+이름으로 치환됩니다.
+
+### 이동 중에는 프롬프트를 숨김
+
+대사창이 닫히고 암전이 시작되기까지 사이에 "문을 연다" 프롬프트가 다시
+떴습니다. 암전 첫 프레임은 알파가 0이라 `GetFadeAlpha() > 0` 으로는 못 막습니다.
+그래서 `ADeceiveGameMode::IsTravelling()`(페이즈가 None이 아님)을 보고
+`DrawInteractPrompt` 에서 빠져나옵니다.
+
+### 옮기는 오브젝트
+
+`FItemData::bCarryable`(Items.json 의 `carryable`) 가 켜진 오브젝트는
+`StartDialogueThen` 으로 질문을 띄우고, 대사가 끝나면
+`UDeceiveGameInstance::TryGetChoice(ChoiceId)` 로 답을 읽어 A를 골랐으면
+`ASpriteCharacter::StartCarrying(this)` 를 부릅니다. 선택지에 새 명령어를
+만들지 않고 기존 선택 기록을 그대로 쓴 것입니다 — 그래서 **질문에 `choiceId`
+가 없으면 잡히지 않습니다.**
+
+옮기는 동안에는 월드에서 액터를 파괴하고 인벤토리에 아이템으로 넣습니다
+(`StartCarrying`). 내려놓을 때 현재 영역의 `SpawnItem` 으로 다시 만듭니다
+(`StopCarrying`). 끌고 다니는 방식은 썼다가 버렸습니다 — 내려놓은 물건이
+보이지 않는 문제가 있었고, 사용자가 인벤토리 방식을 원했습니다.
+
+아이템이 어디 있는지는 `UDeceiveGameInstance::ItemPlacements`
+(`bHeld` / `Area` / `Location`) 가 기억하고, `ADeceiveArea::SpawnContents` 가
+이걸 보고 **표의 위치 대신 놓인 자리에** 만듭니다. 들고 있는 것은 아예 안 만듭니다.
+저장 파일에도 들어갑니다.
+
+지금은 `LockedRoom` 의 `StoneBlock` 하나가 이걸 씁니다.
+
+### 큰 사고 하나
+
+`SpriteCharacter.cpp` 를 "함수 A부터 함수 B 직전까지 잘라내고 새 내용으로
+교체" 하는 스크립트로 고치다가, 그 사이에 있던 함수 20여 개를 통째로 날렸습니다
+(링커 오류로 발견). `git show HEAD:<파일>` 의 옛 버전을 기준으로 이번 세션의
+변경을 다시 얹어 복구했고, HEAD에 있던 함수가 전부 돌아왔는지 대조했습니다.
+
+**교훈: 범위를 잘라내는 방식 대신 함수 단위로 바꿀 것.** 꼭 잘라내야 한다면
+잘라낼 구간을 먼저 출력해서 확인할 것.
+
+### 돌무더기 / 돌맹이 (집기 · 내려놓기)
+
+들고 다니는 구조를 다시 바꿨습니다. 지금은:
+
+- 인벤토리는 **같은 아이템을 중복으로 담습니다** (한 칸에 하나씩).
+  `RemoveInventoryItem` 은 `RemoveSingle` 이어야 합니다 — `Remove` 는 같은 값을
+  전부 지웁니다.
+- 집기는 대사 선택지의 `addItems` 그대로입니다 (새 코드 없음).
+- 내려놓기는 인벤토리 탭에서 `F` → `ASpriteCharacter::PlaceSelectedItem()`.
+  `Inventory.json` 의 `placeable` 과 `Items.json` 의 같은 id 항목이 둘 다 있어야
+  합니다.
+- 내려놓은 것은 `UDeceiveGameInstance::PlacedItems`(배열)에 쌓이고,
+  `ADeceiveArea::SpawnContents` 가 표 항목 + 이 배열을 둘 다 만듭니다.
+  `placedOnly` 항목은 표에서 안 만듭니다.
+
+`AInteractableBox` 의 CarryIfAccepted, `StartCarrying/StopCarrying`,
+HUD 의 `CarryPrompt` 는 전부 지웠습니다.
+
+### 돌맹이 — 다시 줍기 · 통과 · 가득 참
+
+- 내려놓은 사본마다 `PlacedId`(1부터, 재사용 안 함)가 붙습니다.
+  `AInteractableBox::PlacedId` 가 0이 아니면 내려놓은 사본이고, 그때만
+  `TakeIfAccepted` 로 다시 주울 수 있습니다. 주우면
+  `RemovePlacedItem(PlacedId)` 로 그 하나만 지웁니다.
+- `walkThrough` 가 켜진 아이템은 메시 콜리전이 `OverlapAllDynamic` 이라 길을
+  막지 않습니다. 상호작용은 겹침으로 잡히므로 그대로 됩니다.
+- 내려놓는 위치는 플레이어 위치 그대로입니다 (`DropDistance` 는 없앴습니다).
+- 인벤토리가 가득 차면 `AddInventoryItem` 이 false 를 돌려주고, 대사 `addItems`
+  쪽과 다시 줍기 쪽 양쪽에서 알림 상자를 띄웁니다.
+
+### 키 배치 (Z / X / Shift / C)
+
+`EnsureInputObjects()` 에서 바뀝니다 — Z 상호작용, X 취소, Shift 달리기,
+C 메뉴. 달리기는 `RunAction` 의 Started/Completed 에서
+`MaxWalkSpeed` 를 `WalkSpeed * RunSpeedMultiplier` 로 올렸다 되돌립니다.
+X(`Cancel`)는 메뉴에서만 동작하고, 내용 → 탭 → 닫기 순으로 한 단계씩 빠집니다.
+대사 중에는 아무 일도 하지 않습니다.
+
+화면 힌트 문구(`DialogueHint`, `ChoiceHint`, `InventoryHint`, `SaveHint`)도
+같이 고쳐야 합니다 — 키를 또 바꾸면 여기도 손볼 것.
+
+### 가득 찬 소지품은 대사로
+
+알림 상자로 띄웠더니 선택지 결과 대사("집어 넣었다")와 정반대 내용이 동시에
+보였습니다. 지금은:
+
+- 대사 `addItems` 로 들어오다 실패하면 `SelectChoice` 가 결과 대사 대신
+  `InventoryFullLine` 을 보여줍니다.
+- 내려놓은 물건을 다시 줍는 쪽은 **질문하기 전에** `IsInventoryFull()` 을 보고
+  `SayInventoryFull()` 로 끝냅니다 (묻지 않음).
+
+### 메뉴 구역과 선택지 취소
+
+메뉴는 탭 구역 / 내용 구역 두 개로 나뉘고, 방향키는 구역 안에서만 움직입니다
+(`MoveMenuCursorSideways` 는 내용 구역의 격자에서만 동작). 구역 이동은
+`ActivateMenuRow`(Z, 탭 → 내용)와 `Cancel`(X, 내용 → 탭 → 닫기)뿐입니다.
+메뉴는 탭 구역에서 열립니다.
+
+선택지가 떠 있을 때 X 는 `CancelDialogue()` — **먼저 `DialogueClosedHandler`
+를 풀고** 닫습니다. 안 그러면 답하지 않았는데도 문이 열리거나 물건을 줍습니다
+(그 핸들러들은 선택 기록을 되읽는 구조라, 예전 기록이 남아 있으면 그대로
+실행됩니다). 평범한 대사 줄은 X 로 건너뛸 수 없습니다.
+
+### 정보 탭과 플레이어 데이터
+
+`Content/Data/Player.json` → `FDeceivePlayerData`(이름/초상화/최대체력/상태).
+`UDeceiveGameInstance::Init()` 이 Super::Init 뒤에 서브시스템에서 읽어
+현재 체력과 상태를 채웁니다 (서브시스템은 Super::Init 중에 올라옵니다).
+현재 체력·상태는 저장 파일에도 들어갑니다. 체력을 깎는 코드는 아직 없습니다.
+
+그리기는 `ADeceiveHUD::DrawInfoTab` — 초상화, 이름, 상태, 체력 막대.
+초상화도 `ResolveItemTexture` 를 그대로 써서 경로가 비면 대체 이미지로 갑니다.
+
+메뉴는 열 때마다 `ActiveTab = Info` 로 되돌립니다 (저장 탭에서 닫고 다시 열면
+저장 탭이 나오던 문제).
+
+선택지 취소(X)는 그냥 닫지 않고 `CancelledLine`("다시 생각해보자.") 한 줄을
+남깁니다 — 핸들러는 먼저 풀어둡니다.
+
+### 잠긴 방 퍼즐
+
+`ALockedRoomArea : ARoomArea` 가 방 + 철창 + 발판을 담당합니다.
+
+- `ADeceiveArea::CreateBoxes` 가 이름을 `Boxes.Num()` 부터 번호 매기도록
+  바꿨습니다. 그래야 자식 클래스가 생성자에서 박스를 더 만들 수 있습니다
+  (`Box0` 이름 충돌 방지). 잠긴 방은 7개(방) + 3개(철창 2 + 문 1) = 10개.
+- 문은 액터가 아니라 박스 하나입니다. 열릴 때 `SetHiddenInGame(true)` +
+  콜리전 해제, 닫힐 때 되돌립니다.
+- **문 상태는 발판에서 매 틱 계산합니다** (래치 아님). 발판에서 무게가 빠지면
+  닫힙니다. 그래서 플래그로 기억할 것이 없습니다 — 내려놓은 물건 위치가
+  저장되므로 다시 들어오면 알아서 같은 상태가 됩니다.
+  방에 들어와 처음 한 번은 `bFirstCheck` 로 대사 없이 상태만 맞춥니다.
+- 발판(`APressurePlate`)은 판정만 합니다 (`IsPressed()` 가 겹친 액터 중
+  Pawn 이나 `AInteractableBox` 가 있는지 확인). 퍼즐 판단은 방이 Tick 에서
+  합니다 — 발판이 늘어도 코드는 그대로입니다.
+- 마지막 발판이 눌리는 프레임에는 `Plate_Click` 을 건너뛰고 `Gate_Open` 만
+  띄웁니다. 안 그러면 같은 프레임에 대사창을 두 번 덮어씁니다.
+
+발판 문구는 **알림 상자**입니다 (`Notice()` — Dialogues.json 항목의 첫 줄만
+씁니다). 대사창이면 발판을 밟을 때마다 이동이 멈춰서 바꿨습니다.
+문이 열리고 닫히는 것만 대사창(`Say()`)이고, 문 상태가 바뀐 프레임에는
+발판 알림을 건너뜁니다 (한 프레임에 둘 다 뜨지 않도록).
+
+### 글자 방 (OPEN 퍼즐)
+
+새 영역 `EDeceiveArea::PuzzleRoom` / `AWordPuzzleRoom`(ADeceiveArea 직접 상속).
+골목 -X 팔 끝 → 글자 방 → (풀면) 왼쪽 긴 복도 아래쪽, 이렇게 이어집니다.
+
+- `WordRows` 문자열 격자가 글자 전부입니다. `#` 책상, 숫자는 그 색 빈칸.
+  책상 개수를 세어 `CreateBoxes` 에 넘기므로 글자를 바꿔도 박스 수는 자동입니다.
+  박스 배치: 0 바닥, 1-3 뒷벽(문 2개로 3토막), 4 앞벽, 5/6 옆벽, 7/8 막는 벽,
+  9부터 책상.
+- `APushableBox` 는 플레이어 속도를 받아 **한 축으로만** sweep 이동합니다
+  (당기기 없음, 책상·벽에 막힘). 색은 `DrawDebugBox`.
+- 빈칸은 액터가 아니라 방이 들고 있는 `FWordPuzzleSlot` 배열입니다. 방이 Tick 에서
+  색이 같은 상자가 `SnapDistance` 안에 들어왔는지 보고 자리에 앉힙니다.
+- 다 채우면 `WordPuzzle_Solved` 플래그 → 나가는 포탈의 `RequiredFlag` 가 그것.
+
+`AAreaTransition` 에 `RequiredFlag` 를 추가했습니다 (아이템이 아니라 플래그로
+잠그는 문). 아이템 잠금과 달리 소모도 해제도 없습니다.
+
+`ARoomArea` 가 **두 번째 문**을 가질 수 있게 됐습니다 (`bHasSecondDoor`,
+`SecondDoorSide`, `SecondArea`, `SecondEntry`, `SecondEntryName`).
+박스는 항상 9개를 만들고, 문이 하나면 남는 2개를 `DisableBox` 합니다.
+**그래서 `ALockedRoomArea` 의 박스 번호가 7~9에서 9~11로 밀렸습니다** —
+RoomArea 박스 수를 또 바꾸면 여기도 같이 고쳐야 합니다.
+
+아직 못 한 것: 실제로 밀어서 풀어본 검증 (헤드리스가 여전히 안 돌아감).
+미는 느낌(속도·접촉 범위)과 난이도는 플레이로 맞춰야 합니다.

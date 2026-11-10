@@ -2,12 +2,60 @@
   "WoodenBox": {
     "label": "Item_WoodenBox",
     "prompt": "조사한다",
-    "dialogue": "WoodenBox",
+    "dialogue": [
+      "WoodenBox_Empty",
+      "WoodenBox"
+    ],
     "size": 150,
     "area": "Alley",
     "location": {
       "x": 0,
       "y": 0,
+      "z": 75
+    }
+  },
+  "StonePile": {
+    "label": "Item_StonePile",
+    "prompt": "조사한다",
+    "dialogue": [
+      "StonePile"
+    ],
+    "size": 200,
+    "area": "LockedRoom",
+    "location": {
+      "x": 0,
+      "y": 300,
+      "z": 100
+    }
+  },
+  "Stone": {
+    "label": "Item_Stone",
+    "prompt": "조사한다",
+    "dialogue": [
+      "Stone"
+    ],
+    "size": 70,
+    "placedOnly": true,
+    "area": "LockedRoom",
+    "location": {
+      "x": 0,
+      "y": 0,
+      "z": 35
+    },
+    "walkThrough": true
+  },
+  "RewardChest": {
+    "label": "Item_RewardChest",
+    "prompt": "조사한다",
+    "dialogue": [
+      "RewardChest_Empty",
+      "RewardChest"
+    ],
+    "size": 150,
+    "area": "LockedRoom",
+    "location": {
+      "x": -550,
+      "y": 650,
       "z": 75
     }
   }

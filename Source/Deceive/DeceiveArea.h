@@ -6,6 +6,7 @@
 #include "DeceiveArea.generated.h"
 
 class AAreaTransition;
+struct FItemData;
 class AInteractableBox;
 class UStaticMeshComponent;
 class UMaterialInterface;
@@ -70,11 +71,20 @@ protected:
 	 */
 	void LayOutBlocker(int32 Index, const FVector& Center, const FVector& Size);
 
+	/** Takes a box out of play, for the ones a particular layout does not use. */
+	void DisableBox(int32 Index);
+
 	/**
 	 * Spawns whatever lives inside this area. Called once, on BeginPlay. The base
 	 * version spawns this area's entries from Items.json; overrides should call it.
 	 */
 	virtual void SpawnContents();
+
+public:
+	/** Builds one item here, at Location. Used when the player puts something down. */
+	AInteractableBox* SpawnItem(const FItemData& Item, const FVector& Location, int32 PlacedId = 0);
+
+protected:
 
 	AAreaTransition* SpawnTransition(const FVector& Location, const FVector& Extent, EDeceiveArea TargetArea, FName TargetEntry);
 
